@@ -234,6 +234,14 @@ func (b *Builder) Build() (rt RuntimeConfig, warnings []string, err error) {
 		checks = append(checks, b.checkVal(&check))
 	}
 
+	var services []*structs.ServiceDefinition
+	for _, service := range c.Services {
+		services = append(services, b.serviceVal(&service))
+	}
+	if c.Service != nil {
+		services = append(services, b.serviceVal(c.Service))
+	}
+
 	var bindAddrs []string
 	if c.BindAddr != nil {
 		bindAddrs = []string{b.addrVal(c.BindAddr)}
@@ -448,6 +456,7 @@ func (b *Builder) Build() (rt RuntimeConfig, warnings []string, err error) {
 		RetryJoinWAN:                c.RetryJoinWAN,
 		ServerMode:                  b.boolVal(c.ServerMode),
 		ServerName:                  b.stringVal(c.ServerName),
+		Services:                    services,
 		SessionTTLMin:               b.durationVal(c.SessionTTLMin),
 		SkipLeaveOnInt:              b.boolVal(c.SkipLeaveOnInt),
 		StartJoinAddrsLAN:           c.StartJoinAddrsLAN,
@@ -505,6 +514,11 @@ func (b *Builder) checkVal(v *CheckDefinition) *structs.CheckDefinition {
 		return nil
 	}
 
+	id := types.CheckID(b.stringVal(v.ID))
+	if v.CheckID != nil {
+		id = types.CheckID(b.stringVal(v.CheckID))
+	}
+
 	serviceID := v.ServiceID
 	if v.AliasServiceID != nil {
 		b.deprecate("serviceid", "service_id", "in check definitions")
@@ -530,7 +544,7 @@ func (b *Builder) checkVal(v *CheckDefinition) *structs.CheckDefinition {
 	}
 
 	return &structs.CheckDefinition{
-		ID:                types.CheckID(b.stringVal(v.ID)),
+		ID:                id,
 		Name:              b.stringVal(v.Name),
 		Notes:             b.stringVal(v.Notes),
 		ServiceID:         b.stringVal(serviceID),
@@ -548,6 +562,34 @@ func (b *Builder) checkVal(v *CheckDefinition) *structs.CheckDefinition {
 		Timeout:           b.durationVal(v.Timeout),
 		TTL:               b.durationVal(v.TTL),
 		DeregisterCriticalServiceAfter: b.durationVal(deregisterCriticalServiceAfter),
+	}
+}
+
+func (b *Builder) serviceVal(v *ServiceDefinition) *structs.ServiceDefinition {
+	if b.err != nil || v == nil {
+		return nil
+	}
+
+	var check structs.CheckType
+	if v.Check != nil {
+		check = *b.checkVal(v.Check).CheckType()
+	}
+
+	var checks structs.CheckTypes
+	for _, check := range v.Checks {
+		checks = append(checks, b.checkVal(&check).CheckType())
+	}
+
+	return &structs.ServiceDefinition{
+		ID:                b.stringVal(v.ID),
+		Name:              b.stringVal(v.Name),
+		Tags:              v.Tags,
+		Address:           b.stringVal(v.Address),
+		Port:              b.intVal(v.Port),
+		Token:             b.stringVal(v.Token),
+		EnableTagOverride: b.boolVal(v.EnableTagOverride),
+		Check:             check,
+		Checks:            checks,
 	}
 }
 

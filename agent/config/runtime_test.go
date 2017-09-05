@@ -666,6 +666,165 @@ func TestFullConfig(t *testing.T) {
 			"retry_max_wan": 23160,
 			"server": true,
 			"server_name": "Oerr9n1G",
+			"service": {
+				"id": "dLOXpSCI",
+				"name": "o1ynPkp0",
+				"tags": ["nkwshvM5", "NTDWn3ek"],
+				"address": "cOlSOhbp",
+				"token": "msy7iWER",
+				"port": 24237,
+				"enable_tag_override": true,
+				"check": {
+					"check_id": "RMi85Dv8",
+					"name": "iehanzuq",
+					"status": "rCvn53TH",
+					"notes": "fti5lfF3",
+					"script": "rtj34nfd",
+					"http": "dl3Fgme3",
+					"header": {
+						"rjm4DEd3": ["2m3m2Fls"],
+						"l4HwQ112": ["fk56MNlo", "dhLK56aZ"]
+					},
+					"method": "9afLm3Mj",
+					"tcp": "fjiLFqVd",
+					"interval": "23926s",
+					"docker_container_id": "dO5TtRHk",
+					"shell": "e6q2ttES",
+					"tls_skip_verify": true,
+					"timeout": "38483s",
+					"ttl": "10943s",
+					"deregister_critical_service_after": "68787s"
+				},
+				"checks": [
+					{
+						"id": "Zv99e9Ka",
+						"name": "sgV4F7Pk",
+						"notes": "yP5nKbW0",
+						"status": "7oLMEyfu",
+						"script": "NlUQ3nTE",
+						"http": "KyDjGY9H",
+						"header": {
+							"gv5qefTz": [ "5Olo2pMG", "PvvKWQU5" ],
+							"SHOVq1Vv": [ "jntFhyym", "GYJh32pp" ]
+						},
+						"method": "T66MFBfR",
+						"tcp": "bNnNfx2A",
+						"interval": "22224s",
+						"docker_container_id": "ipgdFtjd",
+						"shell": "omVZq7Sz",
+						"tls_skip_verify": true,
+						"timeout": "18913s",
+						"ttl": "44743s",
+						"deregister_critical_service_after": "8482s"
+					},
+					{
+						"id": "G79O6Mpr",
+						"name": "IEqrzrsd",
+						"notes": "SVqApqeM",
+						"status": "XXkVoZXt",
+						"script": "IXLZTM6E",
+						"http": "kyICZsn8",
+						"header": {
+							"4ebP5vL4": [ "G20SrL5Q", "DwPKlMbo" ],
+							"p2UI34Qz": [ "UsG1D0Qh", "NHhRiB6s" ]
+						},
+						"method": "ciYHWors",
+						"tcp": "FfvCwlqH",
+						"interval": "12356s",
+						"docker_container_id": "HBndBU6R",
+						"shell": "hVI33JjA",
+						"tls_skip_verify": true,
+						"timeout": "38282s",
+						"ttl": "1181s",
+						"deregister_critical_service_after": "4992s"
+					}
+				]
+			},
+			"services": [
+				{
+					"id": "la7IkBPB",
+					"name": "o1ynPkp0",
+					"tags": ["nkwshvM5", "NTDWn3ek"],
+					"address": "cOlSOhbp",
+					"token": "msy7iWER",
+					"port": 24237,
+					"enable_tag_override": true,
+					"check": {
+						"check_id": "RMi85Dv8",
+						"name": "iehanzuq",
+						"status": "rCvn53TH",
+						"notes": "fti5lfF3",
+						"script": "rtj34nfd",
+						"http": "dl3Fgme3",
+						"header": {
+							"rjm4DEd3": ["2m3m2Fls"],
+							"l4HwQ112": ["fk56MNlo", "dhLK56aZ"]
+						},
+						"method": "9afLm3Mj",
+						"tcp": "fjiLFqVd",
+						"interval": "23926s",
+						"docker_container_id": "dO5TtRHk",
+						"shell": "e6q2ttES",
+						"tls_skip_verify": true,
+						"timeout": "38483s",
+						"ttl": "10943s",
+						"deregister_critical_service_after": "68787s"
+					}
+				},
+				{
+					"id": "1rrNPAYH",
+					"name": "o1ynPkp0",
+					"tags": ["nkwshvM5", "NTDWn3ek"],
+					"address": "cOlSOhbp",
+					"token": "msy7iWER",
+					"port": 24237,
+					"enable_tag_override": true,
+					"checks": [
+						{
+							"id": "Zv99e9Ka",
+							"name": "sgV4F7Pk",
+							"notes": "yP5nKbW0",
+							"status": "7oLMEyfu",
+							"script": "NlUQ3nTE",
+							"http": "KyDjGY9H",
+							"header": {
+								"gv5qefTz": [ "5Olo2pMG", "PvvKWQU5" ],
+								"SHOVq1Vv": [ "jntFhyym", "GYJh32pp" ]
+							},
+							"method": "T66MFBfR",
+							"tcp": "bNnNfx2A",
+							"interval": "22224s",
+							"docker_container_id": "ipgdFtjd",
+							"shell": "omVZq7Sz",
+							"tls_skip_verify": true,
+							"timeout": "18913s",
+							"ttl": "44743s",
+							"deregister_critical_service_after": "8482s"
+						},
+						{
+							"id": "G79O6Mpr",
+							"name": "IEqrzrsd",
+							"notes": "SVqApqeM",
+							"status": "XXkVoZXt",
+							"script": "IXLZTM6E",
+							"http": "kyICZsn8",
+							"header": {
+								"4ebP5vL4": [ "G20SrL5Q", "DwPKlMbo" ],
+								"p2UI34Qz": [ "UsG1D0Qh", "NHhRiB6s" ]
+							},
+							"method": "ciYHWors",
+							"tcp": "FfvCwlqH",
+							"interval": "12356s",
+							"docker_container_id": "HBndBU6R",
+							"shell": "hVI33JjA",
+							"tls_skip_verify": true,
+							"timeout": "38282s",
+							"ttl": "1181s",
+							"deregister_critical_service_after": "4992s"
+						}
+					]
+				}
+			],
 			"session_ttl_min": "26627s",
 			"skip_leave_on_interrupt": true,
 			"start_join": [ "LR3hGDoG", "MwVpZ4Up" ],
@@ -884,6 +1043,165 @@ func TestFullConfig(t *testing.T) {
 			retry_max_wan = 23160
 			server = true
 			server_name = "Oerr9n1G"
+			service = {
+				id = "dLOXpSCI"
+				name = "o1ynPkp0"
+				tags = ["nkwshvM5", "NTDWn3ek"]
+				address = "cOlSOhbp"
+				token = "msy7iWER"
+				port = 24237
+				enable_tag_override = true
+				check = {
+					check_id = "RMi85Dv8"
+					name = "iehanzuq"
+					status = "rCvn53TH"
+					notes = "fti5lfF3"
+					script = "rtj34nfd"
+					http = "dl3Fgme3"
+					header = {
+						rjm4DEd3 = [ "2m3m2Fls" ]
+						l4HwQ112 = [ "fk56MNlo", "dhLK56aZ" ]
+					}
+					method = "9afLm3Mj"
+					tcp = "fjiLFqVd"
+					interval = "23926s"
+					docker_container_id = "dO5TtRHk"
+					shell = "e6q2ttES"
+					tls_skip_verify = true
+					timeout = "38483s"
+					ttl = "10943s"
+					deregister_critical_service_after = "68787s"
+				}
+				checks = [
+					{
+						id = "Zv99e9Ka"
+						name = "sgV4F7Pk"
+						notes = "yP5nKbW0"
+						status = "7oLMEyfu"
+						script = "NlUQ3nTE"
+						http = "KyDjGY9H"
+						header = {
+							"gv5qefTz" = [ "5Olo2pMG", "PvvKWQU5" ]
+							"SHOVq1Vv" = [ "jntFhyym", "GYJh32pp" ]
+						}
+						method = "T66MFBfR"
+						tcp = "bNnNfx2A"
+						interval = "22224s"
+						docker_container_id = "ipgdFtjd"
+						shell = "omVZq7Sz"
+						tls_skip_verify = true
+						timeout = "18913s"
+						ttl = "44743s"
+						deregister_critical_service_after = "8482s"
+					},
+					{
+						id = "G79O6Mpr"
+						name = "IEqrzrsd"
+						notes = "SVqApqeM"
+						status = "XXkVoZXt"
+						script = "IXLZTM6E"
+						http = "kyICZsn8"
+						header = {
+							"4ebP5vL4" = [ "G20SrL5Q", "DwPKlMbo" ]
+							"p2UI34Qz" = [ "UsG1D0Qh", "NHhRiB6s" ]
+						}
+						method = "ciYHWors"
+						tcp = "FfvCwlqH"
+						interval = "12356s"
+						docker_container_id = "HBndBU6R"
+						shell = "hVI33JjA"
+						tls_skip_verify = true
+						timeout = "38282s"
+						ttl = "1181s"
+						deregister_critical_service_after = "4992s"
+					}
+				]
+			}
+			services = [
+				{
+					id = "la7IkBPB"
+					name = "o1ynPkp0"
+					tags = ["nkwshvM5", "NTDWn3ek"]
+					address = "cOlSOhbp"
+					token = "msy7iWER"
+					port = 24237
+					enable_tag_override = true
+					check = {
+						check_id = "RMi85Dv8"
+						name = "iehanzuq"
+						status = "rCvn53TH"
+						notes = "fti5lfF3"
+						script = "rtj34nfd"
+						http = "dl3Fgme3"
+						header = {
+							rjm4DEd3 = [ "2m3m2Fls" ]
+							l4HwQ112 = [ "fk56MNlo", "dhLK56aZ" ]
+						}
+						method = "9afLm3Mj"
+						tcp = "fjiLFqVd"
+						interval = "23926s"
+						docker_container_id = "dO5TtRHk"
+						shell = "e6q2ttES"
+						tls_skip_verify = true
+						timeout = "38483s"
+						ttl = "10943s"
+						deregister_critical_service_after = "68787s"
+					}
+				},
+				{
+					id = "1rrNPAYH"
+					name = "o1ynPkp0"
+					tags = ["nkwshvM5", "NTDWn3ek"]
+					address = "cOlSOhbp"
+					token = "msy7iWER"
+					port = 24237
+					enable_tag_override = true
+					checks = [
+						{
+							id = "Zv99e9Ka"
+							name = "sgV4F7Pk"
+							notes = "yP5nKbW0"
+							status = "7oLMEyfu"
+							script = "NlUQ3nTE"
+							http = "KyDjGY9H"
+							header = {
+								"gv5qefTz" = [ "5Olo2pMG", "PvvKWQU5" ]
+								"SHOVq1Vv" = [ "jntFhyym", "GYJh32pp" ]
+							}
+							method = "T66MFBfR"
+							tcp = "bNnNfx2A"
+							interval = "22224s"
+							docker_container_id = "ipgdFtjd"
+							shell = "omVZq7Sz"
+							tls_skip_verify = true
+							timeout = "18913s"
+							ttl = "44743s"
+							deregister_critical_service_after = "8482s"
+						},
+						{
+							id = "G79O6Mpr"
+							name = "IEqrzrsd"
+							notes = "SVqApqeM"
+							status = "XXkVoZXt"
+							script = "IXLZTM6E"
+							http = "kyICZsn8"
+							header = {
+								"4ebP5vL4" = [ "G20SrL5Q", "DwPKlMbo" ]
+								"p2UI34Qz" = [ "UsG1D0Qh", "NHhRiB6s" ]
+							}
+							method = "ciYHWors"
+							tcp = "FfvCwlqH"
+							interval = "12356s"
+							docker_container_id = "HBndBU6R"
+							shell = "hVI33JjA"
+							tls_skip_verify = true
+							timeout = "38282s"
+							ttl = "1181s"
+							deregister_critical_service_after = "4992s"
+						}
+					]
+				}
+			]
 			session_ttl_min = "26627s"
 			skip_leave_on_interrupt = true
 			start_join = [ "LR3hGDoG", "MwVpZ4Up" ]
@@ -1028,67 +1346,226 @@ func TestFullConfig(t *testing.T) {
 				DeregisterCriticalServiceAfter: 2366 * time.Second,
 			},
 		},
-		CheckUpdateInterval:                         16507 * time.Second,
-		ClientAddr:                                  "e15dFavQ",
-		DNSAddrsTCP:                                 []string{"6rFPKyh6:7001"},
-		DNSAddrsUDP:                                 []string{"6rFPKyh6:7001"},
-		DNSAllowStale:                               true,
-		DNSDisableCompression:                       true,
-		DNSDomain:                                   "7W1xXSqd",
-		DNSEnableTruncate:                           true,
-		DNSMaxStale:                                 29685 * time.Second,
-		DNSNodeTTL:                                  7084 * time.Second,
-		DNSOnlyPassing:                              true,
-		DNSPort:                                     7001,
-		DNSRecursorTimeout:                          4427 * time.Second,
-		DNSRecursors:                                []string{"EZX7MOYF", "FtFhoUHl", "UYkwck1k"},
-		DNSServiceTTL:                               map[string]time.Duration{"*": 32030 * time.Second},
-		DNSUDPAnswerLimit:                           29909,
-		DataDir:                                     "oTOOIoV9",
-		Datacenter:                                  "rzo029wG",
-		DevMode:                                     true,
-		DisableAnonymousSignature:                   true,
-		DisableCoordinates:                          true,
-		DisableHostNodeID:                           true,
-		DisableKeyringFile:                          true,
-		DisableRemoteExec:                           true,
-		DisableUpdateCheck:                          true,
-		EnableACLReplication:                        true,
-		EnableDebug:                                 true,
-		EnableScriptChecks:                          true,
-		EnableSyslog:                                true,
-		EnableUI:                                    true,
-		EncryptKey:                                  "A4wELWqH",
-		EncryptVerifyIncoming:                       true,
-		EncryptVerifyOutgoing:                       true,
-		HTTPAddrs:                                   []string{"6rFPKyh6:7999"},
-		HTTPBlockEndpoints:                          []string{"RBvAFcGD", "fWOWFznh"},
-		HTTPPort:                                    7999,
-		HTTPResponseHeaders:                         map[string]string{"M6TKa9NP": "xjuxjOzQ", "JRCrHZed": "rl0mTx81"},
-		HTTPSAddrs:                                  []string{"6rFPKyh6:15127"},
-		HTTPSPort:                                   15127,
-		KeyFile:                                     "IEkkwgIA",
-		LeaveOnTerm:                                 true,
-		LogLevel:                                    "k1zo9Spt",
-		NodeID:                                      "AsUIlw99",
-		NodeMeta:                                    map[string]string{"5mgGQMBk": "mJLtVMSG", "A7ynFMJB": "0Nx6RGab"},
-		NodeName:                                    "otlLxGaI",
-		NonVotingServer:                             true,
-		PerformanceRaftMultiplier:                   22057,
-		PidFile:                                     "43xN80Km",
-		RPCProtocol:                                 30793,
-		RaftProtocol:                                19016,
-		ReconnectTimeoutLAN:                         23739 * time.Second,
-		ReconnectTimeoutWAN:                         26694 * time.Second,
-		RejoinAfterLeave:                            true,
-		RetryJoinIntervalLAN:                        8067 * time.Second,
-		RetryJoinIntervalWAN:                        28866 * time.Second,
-		RetryJoinLAN:                                []string{"pbsSFY7U", "l0qLtWij"},
-		RetryJoinMaxAttemptsLAN:                     913,
-		RetryJoinMaxAttemptsWAN:                     23160,
-		RetryJoinWAN:                                []string{"PFsR02Ye", "rJdQIhER"},
-		ServerMode:                                  true,
-		ServerName:                                  "Oerr9n1G",
+		CheckUpdateInterval:       16507 * time.Second,
+		ClientAddr:                "e15dFavQ",
+		DNSAddrsTCP:               []string{"6rFPKyh6:7001"},
+		DNSAddrsUDP:               []string{"6rFPKyh6:7001"},
+		DNSAllowStale:             true,
+		DNSDisableCompression:     true,
+		DNSDomain:                 "7W1xXSqd",
+		DNSEnableTruncate:         true,
+		DNSMaxStale:               29685 * time.Second,
+		DNSNodeTTL:                7084 * time.Second,
+		DNSOnlyPassing:            true,
+		DNSPort:                   7001,
+		DNSRecursorTimeout:        4427 * time.Second,
+		DNSRecursors:              []string{"EZX7MOYF", "FtFhoUHl", "UYkwck1k"},
+		DNSServiceTTL:             map[string]time.Duration{"*": 32030 * time.Second},
+		DNSUDPAnswerLimit:         29909,
+		DataDir:                   "oTOOIoV9",
+		Datacenter:                "rzo029wG",
+		DevMode:                   true,
+		DisableAnonymousSignature: true,
+		DisableCoordinates:        true,
+		DisableHostNodeID:         true,
+		DisableKeyringFile:        true,
+		DisableRemoteExec:         true,
+		DisableUpdateCheck:        true,
+		EnableACLReplication:      true,
+		EnableDebug:               true,
+		EnableScriptChecks:        true,
+		EnableSyslog:              true,
+		EnableUI:                  true,
+		EncryptKey:                "A4wELWqH",
+		EncryptVerifyIncoming:     true,
+		EncryptVerifyOutgoing:     true,
+		HTTPAddrs:                 []string{"6rFPKyh6:7999"},
+		HTTPBlockEndpoints:        []string{"RBvAFcGD", "fWOWFznh"},
+		HTTPPort:                  7999,
+		HTTPResponseHeaders:       map[string]string{"M6TKa9NP": "xjuxjOzQ", "JRCrHZed": "rl0mTx81"},
+		HTTPSAddrs:                []string{"6rFPKyh6:15127"},
+		HTTPSPort:                 15127,
+		KeyFile:                   "IEkkwgIA",
+		LeaveOnTerm:               true,
+		LogLevel:                  "k1zo9Spt",
+		NodeID:                    "AsUIlw99",
+		NodeMeta:                  map[string]string{"5mgGQMBk": "mJLtVMSG", "A7ynFMJB": "0Nx6RGab"},
+		NodeName:                  "otlLxGaI",
+		NonVotingServer:           true,
+		PerformanceRaftMultiplier: 22057,
+		PidFile:                   "43xN80Km",
+		RPCProtocol:               30793,
+		RaftProtocol:              19016,
+		ReconnectTimeoutLAN:       23739 * time.Second,
+		ReconnectTimeoutWAN:       26694 * time.Second,
+		RejoinAfterLeave:          true,
+		RetryJoinIntervalLAN:      8067 * time.Second,
+		RetryJoinIntervalWAN:      28866 * time.Second,
+		RetryJoinLAN:              []string{"pbsSFY7U", "l0qLtWij"},
+		RetryJoinMaxAttemptsLAN:   913,
+		RetryJoinMaxAttemptsWAN:   23160,
+		RetryJoinWAN:              []string{"PFsR02Ye", "rJdQIhER"},
+		ServerMode:                true,
+		ServerName:                "Oerr9n1G",
+		Services: []*structs.ServiceDefinition{
+			{
+				ID:                "la7IkBPB",
+				Name:              "o1ynPkp0",
+				Tags:              []string{"nkwshvM5", "NTDWn3ek"},
+				Address:           "cOlSOhbp",
+				Token:             "msy7iWER",
+				Port:              24237,
+				EnableTagOverride: true,
+				Check: structs.CheckType{
+					CheckID: "RMi85Dv8",
+					Name:    "iehanzuq",
+					Status:  "rCvn53TH",
+					Notes:   "fti5lfF3",
+					Script:  "rtj34nfd",
+					HTTP:    "dl3Fgme3",
+					Header: map[string][]string{
+						"rjm4DEd3": {"2m3m2Fls"},
+						"l4HwQ112": {"fk56MNlo", "dhLK56aZ"},
+					},
+					Method:            "9afLm3Mj",
+					TCP:               "fjiLFqVd",
+					Interval:          23926 * time.Second,
+					DockerContainerID: "dO5TtRHk",
+					Shell:             "e6q2ttES",
+					TLSSkipVerify:     true,
+					Timeout:           38483 * time.Second,
+					TTL:               10943 * time.Second,
+					DeregisterCriticalServiceAfter: 68787 * time.Second,
+				},
+			},
+			{
+				ID:                "1rrNPAYH",
+				Name:              "o1ynPkp0",
+				Tags:              []string{"nkwshvM5", "NTDWn3ek"},
+				Address:           "cOlSOhbp",
+				Token:             "msy7iWER",
+				Port:              24237,
+				EnableTagOverride: true,
+				Checks: structs.CheckTypes{
+					&structs.CheckType{
+						CheckID: "Zv99e9Ka",
+						Name:    "sgV4F7Pk",
+						Notes:   "yP5nKbW0",
+						Status:  "7oLMEyfu",
+						Script:  "NlUQ3nTE",
+						HTTP:    "KyDjGY9H",
+						Header: map[string][]string{
+							"gv5qefTz": {"5Olo2pMG", "PvvKWQU5"},
+							"SHOVq1Vv": {"jntFhyym", "GYJh32pp"},
+						},
+						Method:            "T66MFBfR",
+						TCP:               "bNnNfx2A",
+						Interval:          22224 * time.Second,
+						DockerContainerID: "ipgdFtjd",
+						Shell:             "omVZq7Sz",
+						TLSSkipVerify:     true,
+						Timeout:           18913 * time.Second,
+						TTL:               44743 * time.Second,
+						DeregisterCriticalServiceAfter: 8482 * time.Second,
+					},
+					&structs.CheckType{
+						CheckID: "G79O6Mpr",
+						Name:    "IEqrzrsd",
+						Notes:   "SVqApqeM",
+						Status:  "XXkVoZXt",
+						Script:  "IXLZTM6E",
+						HTTP:    "kyICZsn8",
+						Header: map[string][]string{
+							"4ebP5vL4": {"G20SrL5Q", "DwPKlMbo"},
+							"p2UI34Qz": {"UsG1D0Qh", "NHhRiB6s"},
+						},
+						Method:            "ciYHWors",
+						TCP:               "FfvCwlqH",
+						Interval:          12356 * time.Second,
+						DockerContainerID: "HBndBU6R",
+						Shell:             "hVI33JjA",
+						TLSSkipVerify:     true,
+						Timeout:           38282 * time.Second,
+						TTL:               1181 * time.Second,
+						DeregisterCriticalServiceAfter: 4992 * time.Second,
+					},
+				},
+			},
+			{
+				ID:                "dLOXpSCI",
+				Name:              "o1ynPkp0",
+				Tags:              []string{"nkwshvM5", "NTDWn3ek"},
+				Address:           "cOlSOhbp",
+				Token:             "msy7iWER",
+				Port:              24237,
+				EnableTagOverride: true,
+				Check: structs.CheckType{
+					CheckID: "RMi85Dv8",
+					Name:    "iehanzuq",
+					Status:  "rCvn53TH",
+					Notes:   "fti5lfF3",
+					Script:  "rtj34nfd",
+					HTTP:    "dl3Fgme3",
+					Header: map[string][]string{
+						"rjm4DEd3": {"2m3m2Fls"},
+						"l4HwQ112": {"fk56MNlo", "dhLK56aZ"},
+					},
+					Method:            "9afLm3Mj",
+					TCP:               "fjiLFqVd",
+					Interval:          23926 * time.Second,
+					DockerContainerID: "dO5TtRHk",
+					Shell:             "e6q2ttES",
+					TLSSkipVerify:     true,
+					Timeout:           38483 * time.Second,
+					TTL:               10943 * time.Second,
+					DeregisterCriticalServiceAfter: 68787 * time.Second,
+				},
+				Checks: structs.CheckTypes{
+					&structs.CheckType{
+						CheckID: "Zv99e9Ka",
+						Name:    "sgV4F7Pk",
+						Notes:   "yP5nKbW0",
+						Status:  "7oLMEyfu",
+						Script:  "NlUQ3nTE",
+						HTTP:    "KyDjGY9H",
+						Header: map[string][]string{
+							"gv5qefTz": {"5Olo2pMG", "PvvKWQU5"},
+							"SHOVq1Vv": {"jntFhyym", "GYJh32pp"},
+						},
+						Method:            "T66MFBfR",
+						TCP:               "bNnNfx2A",
+						Interval:          22224 * time.Second,
+						DockerContainerID: "ipgdFtjd",
+						Shell:             "omVZq7Sz",
+						TLSSkipVerify:     true,
+						Timeout:           18913 * time.Second,
+						TTL:               44743 * time.Second,
+						DeregisterCriticalServiceAfter: 8482 * time.Second,
+					},
+					&structs.CheckType{
+						CheckID: "G79O6Mpr",
+						Name:    "IEqrzrsd",
+						Notes:   "SVqApqeM",
+						Status:  "XXkVoZXt",
+						Script:  "IXLZTM6E",
+						HTTP:    "kyICZsn8",
+						Header: map[string][]string{
+							"4ebP5vL4": {"G20SrL5Q", "DwPKlMbo"},
+							"p2UI34Qz": {"UsG1D0Qh", "NHhRiB6s"},
+						},
+						Method:            "ciYHWors",
+						TCP:               "FfvCwlqH",
+						Interval:          12356 * time.Second,
+						DockerContainerID: "HBndBU6R",
+						Shell:             "hVI33JjA",
+						TLSSkipVerify:     true,
+						Timeout:           38282 * time.Second,
+						TTL:               1181 * time.Second,
+						DeregisterCriticalServiceAfter: 4992 * time.Second,
+					},
+				},
+			},
+		},
 		SessionTTLMin:                               26627 * time.Second,
 		SkipLeaveOnInt:                              true,
 		StartJoinAddrsLAN:                           []string{"LR3hGDoG", "MwVpZ4Up"},

@@ -113,6 +113,7 @@ type RuntimeConfig struct {
 	RetryJoinWAN                []string
 	ServerMode                  bool
 	ServerName                  string
+	Services                    []*structs.ServiceDefinition
 	SessionTTLMin               time.Duration
 	SkipLeaveOnInt              bool
 	SyslogFacility              string
