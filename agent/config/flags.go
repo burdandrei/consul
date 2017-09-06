@@ -8,11 +8,24 @@ import (
 
 // Flags defines the command line flags.
 type Flags struct {
-	Config      Config
-	ConfigFiles []string
-	DevMode     *bool
+	// Config contains the command line arguments that can also be set
+	// in a config file.
+	Config Config
 
-	DeprecatedDatacenter          *string
+	// ConfigFiles contains the list of config files and directories
+	// that should be read.
+	ConfigFiles []string
+
+	// DevMode indicates whether the agent should be started in development
+	// mode. This cannot be configured in a config file.
+	DevMode *bool
+
+	// DeprecatedDatacenter holds the value for the `-dc` flag which is an alias
+	// for `-datacenter.
+	DeprecatedDatacenter *string
+
+	// The DeprecatedAtlas* fields hold the values for deprecated flags.
+	// Setting them only leads to warnings but has no other effect.
 	DeprecatedAtlasInfrastructure *string
 	DeprecatedAtlasJoin           *bool
 	DeprecatedAtlasToken          *string

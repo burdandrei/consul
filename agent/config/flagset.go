@@ -6,7 +6,9 @@ import (
 	"time"
 )
 
-// boolPtrValue
+// boolPtrValue is a flag.Value which stores the value in a *bool if it
+// can be parsed with strconv.ParseBool. If the value was not set the
+// pointer is nil.
 type boolPtrValue struct {
 	v **bool
 	b bool
@@ -41,7 +43,9 @@ func (s *boolPtrValue) String() string {
 	return ""
 }
 
-// durationPtrValue
+// durationPtrValue is a flag.Value which stores the value in a
+// *time.Duration if it can be parsed with time.ParseDuration. If the
+// value was not set the pointer is nil.
 type durationPtrValue struct {
 	v **time.Duration
 	b bool
@@ -74,7 +78,9 @@ func (s *durationPtrValue) String() string {
 	return ""
 }
 
-// intPtrValue
+// intPtrValue is a flag.Value which stores the value in a *int if it
+// can be parsed with strconv.Atoi. If the value was not set the pointer
+// is nil.
 type intPtrValue struct {
 	v **int
 	b bool
@@ -107,7 +113,8 @@ func (s *intPtrValue) String() string {
 	return ""
 }
 
-// stringMapValue
+// stringMapValue is a flag.Value which stores the value in a map[string]string if the
+// value is in "key:value" format. This can be specified multiple times.
 type stringMapValue map[string]string
 
 func newStringMapValue(p *map[string]string) *stringMapValue {
@@ -141,7 +148,8 @@ func (s *stringMapValue) String() string {
 	return strings.Join(x, " ")
 }
 
-// stringPtrValue
+// stringPtrValue is a flag.Value which stores the value in a *string.
+// If the value was not set the pointer is nil.
 type stringPtrValue struct {
 	v **string
 	b bool
@@ -170,7 +178,8 @@ func (s *stringPtrValue) String() string {
 	return ""
 }
 
-// stringSliceValue
+// stringSliceValue is a flag.Value which appends the value to a []string.
+// This can be specified multiple times.
 type stringSliceValue []string
 
 func newStringSliceValue(p *[]string) *stringSliceValue {
