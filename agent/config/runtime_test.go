@@ -256,6 +256,60 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			rt:    RuntimeConfig{Datacenter: "a"},
 			warns: []string{`'-dc' is deprecated. Use '-datacenter' instead`},
 		},
+		{
+			desc:  "-retry-join-azure-tag-name",
+			flags: []string{`-retry-join-azure-tag-name`, `a`},
+			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=azure tag_name=a"}},
+			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_name=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-azure-tag-value",
+			flags: []string{`-retry-join-azure-tag-value`, `a`},
+			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=azure tag_value=a"}},
+			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_value=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-ec2-region",
+			flags: []string{`-retry-join-ec2-region`, `a`},
+			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=aws region=a"}},
+			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws region=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-ec2-tag-key",
+			flags: []string{`-retry-join-ec2-tag-key`, `a`},
+			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=aws tag_key=a"}},
+			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_key=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-ec2-tag-value",
+			flags: []string{`-retry-join-ec2-tag-value`, `a`},
+			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=aws tag_value=a"}},
+			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_value=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-gce-credentials-file",
+			flags: []string{`-retry-join-gce-credentials-file`, `a`},
+			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=gce credentials_file=a"}},
+			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-gce-project-name",
+			flags: []string{`-retry-join-gce-project-name`, `a`},
+			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=gce project_name=a"}},
+			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce project_name=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-gce-tag-value",
+			flags: []string{`-retry-join-gce-tag-value`, `a`},
+			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=gce tag_value=a"}},
+			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce tag_value=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-gce-zone-pattern",
+			flags: []string{`-retry-join-gce-zone-pattern`, `a`},
+			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=gce zone_pattern=a"}},
+			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce zone_pattern=a" to retry_join.`},
+		},
 
 		// deprecated fields
 		{
@@ -320,6 +374,81 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			hcl:   []string{`statsite_prefix = "a" telemetry = { statsite_prefix = "b" }`},
 			rt:    RuntimeConfig{TelemetryStatsitePrefix: "a"},
 			warns: []string{`config: "statsite_prefix" is deprecated. Please use "telemetry.statsite_prefix" instead.`},
+		},
+		{
+			desc: "retry_join_azure",
+			json: []string{`{
+				"retry_join_azure":{
+					"tag_name": "a",
+					"tag_value": "b",
+					"subscription_id": "c",
+					"tenant_id": "d",
+					"client_id": "e",
+					"secret_access_key": "f"
+				}
+			}`},
+			hcl: []string{`
+				retry_join_azure = {
+					tag_name = "a"
+					tag_value = "b"
+					subscription_id = "c"
+					tenant_id = "d"
+					client_id = "e"
+					secret_access_key = "f"
+				}
+			`},
+			rt: RuntimeConfig{
+				RetryJoinLAN: []string{"provider=azure client_id=e secret_access_key=f subscription_id=c tag_name=a tag_value=b tenant_id=d"},
+			},
+			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure client_id=hidden secret_access_key=hidden subscription_id=hidden tag_name=a tag_value=b tenant_id=hidden" to retry_join.`},
+		},
+		{
+			desc: "retry_join_ec2",
+			json: []string{`{
+				"retry_join_ec2":{
+					"tag_key": "a",
+					"tag_value": "b",
+					"region": "c",
+					"access_key_id": "d",
+					"secret_access_key": "e"
+				}
+			}`},
+			hcl: []string{`
+				retry_join_ec2 = {
+					tag_key = "a"
+					tag_value = "b"
+					region = "c"
+					access_key_id = "d"
+					secret_access_key = "e"
+				}
+			`},
+			rt: RuntimeConfig{
+				RetryJoinLAN: []string{"provider=aws access_key_id=d region=c secret_access_key=e tag_key=a tag_value=b"},
+			},
+			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws access_key_id=hidden region=c secret_access_key=hidden tag_key=a tag_value=b" to retry_join.`},
+		},
+		{
+			desc: "retry_join_gce",
+			json: []string{`{
+				"retry_join_gce":{
+					"project_name": "a",
+					"zone_pattern": "b",
+					"tag_value": "c",
+					"credentials_file": "d"
+				}
+			}`},
+			hcl: []string{`
+				retry_join_gce = {
+					project_name = "a"
+					zone_pattern = "b"
+					tag_value = "c"
+					credentials_file = "d"
+				}
+			`},
+			rt: RuntimeConfig{
+				RetryJoinLAN: []string{"provider=gce credentials_file=d project_name=a tag_value=c zone_pattern=b"},
+			},
+			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden project_name=a tag_value=c zone_pattern=b" to retry_join.`},
 		},
 
 		// ports and addresses

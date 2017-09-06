@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/tlsutil"
 	"github.com/hashicorp/consul/types"
+	discover "github.com/hashicorp/go-discover"
 	"github.com/hashicorp/hcl"
 )
 
@@ -326,6 +327,80 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		statsitePrefix = b.stringVal(c.DeprecatedStatsitePrefix)
 	}
 
+	// patch deprecated retry-join-{gce,azure,ec2)-* parameters
+	// into -retry-join and issue warning.
+	if !reflect.DeepEqual(c.DeprecatedRetryJoinEC2, RetryJoinEC2{}) {
+		m := discover.Config{
+			"provider":          "aws",
+			"region":            b.stringVal(c.DeprecatedRetryJoinEC2.Region),
+			"tag_key":           b.stringVal(c.DeprecatedRetryJoinEC2.TagKey),
+			"tag_value":         b.stringVal(c.DeprecatedRetryJoinEC2.TagValue),
+			"access_key_id":     b.stringVal(c.DeprecatedRetryJoinEC2.AccessKeyID),
+			"secret_access_key": b.stringVal(c.DeprecatedRetryJoinEC2.SecretAccessKey),
+		}
+		c.RetryJoinLAN = append(c.RetryJoinLAN, m.String())
+		c.DeprecatedRetryJoinEC2 = RetryJoinEC2{}
+
+		// redact m before output
+		if m["access_key_id"] != "" {
+			m["access_key_id"] = "hidden"
+		}
+		if m["secret_access_key"] != "" {
+			m["secret_access_key"] = "hidden"
+		}
+
+		b.warn("config: retry_join_ec2 is deprecated. Please add %q to retry_join.", m)
+	}
+
+	if !reflect.DeepEqual(c.DeprecatedRetryJoinAzure, RetryJoinAzure{}) {
+		m := discover.Config{
+			"provider":          "azure",
+			"tag_name":          b.stringVal(c.DeprecatedRetryJoinAzure.TagName),
+			"tag_value":         b.stringVal(c.DeprecatedRetryJoinAzure.TagValue),
+			"subscription_id":   b.stringVal(c.DeprecatedRetryJoinAzure.SubscriptionID),
+			"tenant_id":         b.stringVal(c.DeprecatedRetryJoinAzure.TenantID),
+			"client_id":         b.stringVal(c.DeprecatedRetryJoinAzure.ClientID),
+			"secret_access_key": b.stringVal(c.DeprecatedRetryJoinAzure.SecretAccessKey),
+		}
+		c.RetryJoinLAN = append(c.RetryJoinLAN, m.String())
+		c.DeprecatedRetryJoinAzure = RetryJoinAzure{}
+
+		// redact m before output
+		if m["subscription_id"] != "" {
+			m["subscription_id"] = "hidden"
+		}
+		if m["tenant_id"] != "" {
+			m["tenant_id"] = "hidden"
+		}
+		if m["client_id"] != "" {
+			m["client_id"] = "hidden"
+		}
+		if m["secret_access_key"] != "" {
+			m["secret_access_key"] = "hidden"
+		}
+
+		b.warn("config: retry_join_azure is deprecated. Please add %q to retry_join.", m)
+	}
+
+	if !reflect.DeepEqual(c.DeprecatedRetryJoinGCE, RetryJoinGCE{}) {
+		m := discover.Config{
+			"provider":         "gce",
+			"project_name":     b.stringVal(c.DeprecatedRetryJoinGCE.ProjectName),
+			"zone_pattern":     b.stringVal(c.DeprecatedRetryJoinGCE.ZonePattern),
+			"tag_value":        b.stringVal(c.DeprecatedRetryJoinGCE.TagValue),
+			"credentials_file": b.stringVal(c.DeprecatedRetryJoinGCE.CredentialsFile),
+		}
+		c.RetryJoinLAN = append(c.RetryJoinLAN, m.String())
+		c.DeprecatedRetryJoinGCE = RetryJoinGCE{}
+
+		// redact m before output
+		if m["credentials_file"] != "" {
+			m["credentials_file"] = "hidden"
+		}
+
+		b.warn("config: retry_join_gce is deprecated. Please add %q to retry_join.", m)
+	}
+
 	// missing complex stuff
 	if c.AdvertiseAddrLAN != nil ||
 		c.AdvertiseAddrWAN != nil ||
@@ -409,12 +484,6 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		TelemetryStatsdAddr:                         statsdAddr,
 		TelemetryStatsiteAddr:                       statsiteAddr,
 		TelemetryStatsitePrefix:                     statsitePrefix,
-
-		// RetryJoinAzure
-
-		// RetryJoinEC2
-
-		// RetryJoinGCE
 
 		// Agent
 		BindAddrs:                   bindAddrs,
