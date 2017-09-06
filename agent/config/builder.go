@@ -19,36 +19,25 @@ import (
 )
 
 type Builder struct {
-	// flags contains the parsed command line arguments.
-	flags Flags
+	// Flags contains the parsed command line arguments.
+	Flags Flags
 
-	// defaultConfig contains the default configuration.
-	defaultCfg Config
+	// Default contains the default configuration. When set to nil , the
+	// default configuration depends on the value of the Flags.DevMode
+	// flag.
+	Default *Config
 
-	// configs contains the user configuration fragments in the order
-	// to be merged.
-	configs []Config
+	// Configs contains the user configuration fragments in the order to
+	// be merged.
+	Configs []Config
 
-	// warnings contains the warnigns encountered when
+	// Warnings contains the warnigns encountered when
 	// parsing the configuration.
-	warnings []string
+	Warnings []string
 
 	// err contains the first error that occurred during
 	// building the runtime configuration.
 	err error
-}
-
-// NewBuilder returns a builder to construct a runtime configuration
-// from a set of user configuration fragments and command line arguments.
-func NewBuilder(flags Flags, defaultConfig Config) (*Builder, error) {
-	b := &Builder{flags: flags, defaultCfg: defaultConfig}
-	if err := b.ValidateConfig(flags.Config); err != nil {
-		return nil, err
-	}
-	if err := b.ValidateConfig(defaultConfig); err != nil {
-		return nil, err
-	}
-	return b, nil
 }
 
 // readFile parses a JSON or HCL config file and appends it to the list of
@@ -147,7 +136,7 @@ func (b *Builder) AppendConfig(c Config) error {
 	if err := b.ValidateConfig(c); err != nil {
 		return err
 	}
-	b.configs = append(b.configs, c)
+	b.Configs = append(b.Configs, c)
 	return nil
 }
 
@@ -178,23 +167,42 @@ func (b *Builder) ValidateConfig(c Config) error {
 // precedence over the other fragments. If the error is nil then
 // warnings can still contain deprecation or format warnigns that should
 // be presented to the user.
-func (b *Builder) Build() (rt RuntimeConfig, warnings []string, err error) {
+func (b *Builder) Build() (rt RuntimeConfig, err error) {
+	// validate flags and config fragments
+	if err := b.ValidateConfig(b.Flags.Config); err != nil {
+		return RuntimeConfig{}, err
+	}
+	if b.Default == nil {
+		b.Default = &defaultConfig
+		if b.boolVal(b.Flags.DevMode) {
+			b.Default = &defaultDevConfig
+		}
+	}
+	if err := b.ValidateConfig(*b.Default); err != nil {
+		return RuntimeConfig{}, err
+	}
+	for _, c := range b.Configs {
+		if err := b.ValidateConfig(c); err != nil {
+			return RuntimeConfig{}, err
+		}
+	}
+
 	// check deprecated flags
-	if b.flags.DeprecatedAtlasInfrastructure != nil {
+	if b.Flags.DeprecatedAtlasInfrastructure != nil {
 		b.warn(`'-atlas' is deprecated`)
 	}
-	if b.flags.DeprecatedAtlasToken != nil {
+	if b.Flags.DeprecatedAtlasToken != nil {
 		b.warn(`'-atlas-token' is deprecated`)
 	}
-	if b.flags.DeprecatedAtlasJoin != nil {
+	if b.Flags.DeprecatedAtlasJoin != nil {
 		b.warn(`'-atlas-join' is deprecated`)
 	}
-	if b.flags.DeprecatedAtlasEndpoint != nil {
+	if b.Flags.DeprecatedAtlasEndpoint != nil {
 		b.warn(`'-atlas-endpoint' is deprecated`)
 	}
-	if b.stringVal(b.flags.DeprecatedDatacenter) != "" && b.stringVal(b.flags.Config.Datacenter) == "" {
+	if b.stringVal(b.Flags.DeprecatedDatacenter) != "" && b.stringVal(b.Flags.Config.Datacenter) == "" {
 		b.warn(`'-dc' is deprecated. Use '-datacenter' instead`)
-		b.flags.Config.Datacenter = b.flags.DeprecatedDatacenter
+		b.Flags.Config.Datacenter = b.Flags.DeprecatedDatacenter
 	}
 
 	// config fragments are merged as follows:
@@ -206,10 +214,9 @@ func (b *Builder) Build() (rt RuntimeConfig, warnings []string, err error) {
 	// we need to merge all slice values defined in flags before we
 	// merge the config files since the flag values for slices are
 	// otherwise appended instead of prepended.
-	flagSlices, flagValues := b.splitSlicesAndValues(b.flags.Config)
-	// todo(fs): honor dev config
-	cfgs := []Config{b.defaultCfg, flagSlices}
-	cfgs = append(cfgs, b.configs...)
+	flagSlices, flagValues := b.splitSlicesAndValues(b.Flags.Config)
+	cfgs := []Config{*b.Default, flagSlices}
+	cfgs = append(cfgs, b.Configs...)
 	cfgs = append(cfgs, flagValues)
 	c := Merge(cfgs)
 
@@ -421,7 +428,7 @@ func (b *Builder) Build() (rt RuntimeConfig, warnings []string, err error) {
 		ClientAddr:                  b.stringVal(c.ClientAddr),
 		DataDir:                     b.stringVal(c.DataDir),
 		Datacenter:                  b.stringVal(c.Datacenter),
-		DevMode:                     b.boolVal(b.flags.DevMode),
+		DevMode:                     b.boolVal(b.Flags.DevMode),
 		DisableAnonymousSignature:   b.boolVal(c.DisableAnonymousSignature),
 		DisableCoordinates:          b.boolVal(c.DisableCoordinates),
 		DisableHostNodeID:           b.boolVal(c.DisableHostNodeID),
@@ -478,7 +485,7 @@ func (b *Builder) Build() (rt RuntimeConfig, warnings []string, err error) {
 		VerifyServerHostname:        b.boolVal(c.VerifyServerHostname),
 	}
 
-	return rt, b.warnings, b.err
+	return rt, b.err
 }
 
 // splitSlicesAndValues moves all slice values defined in c to 'slices'
@@ -506,7 +513,7 @@ func (b *Builder) deprecate(oldname, newname, where string) {
 }
 
 func (b *Builder) warn(msg string, args ...interface{}) {
-	b.warnings = append(b.warnings, fmt.Sprintf(msg, args...))
+	b.Warnings = append(b.Warnings, fmt.Sprintf(msg, args...))
 }
 
 func (b *Builder) checkVal(v *CheckDefinition) *structs.CheckDefinition {

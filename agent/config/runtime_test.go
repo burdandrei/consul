@@ -455,22 +455,19 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					t.Fatalf("ParseFlags failed: %s", err)
 				}
 
-				b, err := NewBuilder(flags, Config{})
-				if err != nil {
-					t.Fatalf("NewBuilder failed: %s", err)
-				}
+				b := &Builder{Flags: flags, Default: &Config{}}
 				for _, src := range srcs {
 					if err := b.ReadBytes([]byte(src), format); err != nil {
 						t.Fatalf("ReadBytes failed for %q: %s", src, err)
 					}
 				}
-				rt, warnings, err := b.Build()
+				rt, err := b.Build()
 
 				if !verify.Values(t, "", rt, tt.rt) {
 					t.FailNow()
 				}
 
-				if !verify.Values(t, "warnings", warnings, tt.warns) {
+				if !verify.Values(t, "warnings", b.Warnings, tt.warns) {
 					t.FailNow()
 				}
 			})
@@ -1627,16 +1624,16 @@ func TestFullConfig(t *testing.T) {
 			// 	t.Fatal(err)
 			// }
 
-			b, err := NewBuilder(flags, Config{})
-			if err != nil {
-				t.Fatalf("NewBuilder: %s", err)
-			}
+			b := &Builder{Flags: flags, Default: &Config{}}
 			if err := b.ReadBytes([]byte(s), format); err != nil {
 				t.Fatalf("ReadBytes: %s", err)
 			}
-			rt, warnings, err := b.Build()
-			if len(warnings) > 0 {
-				t.Fatal("got %d warnings want 0: %v", len(warnings), warnings)
+			rt, err := b.Build()
+			if err != nil {
+				t.Fatalf("Build: %s", err)
+			}
+			if len(b.Warnings) > 0 {
+				t.Fatal("got %d warnings want 0: %v", len(b.Warnings), b.Warnings)
 			}
 			if !verify.Values(t, "", rt, want) {
 				t.FailNow()

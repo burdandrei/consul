@@ -65,6 +65,9 @@ var defaultConfig = Config{
 
 }
 
+// todo(fs): fix me
+var defaultDevConfig = defaultConfig
+
 // defaultRuntimeConfig contains the default values of the runtime configuration
 // which cannot be configured through the config file.
 var defaultRuntimeConfig = RuntimeConfig{
