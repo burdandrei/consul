@@ -292,6 +292,9 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	httpResponseHeaders := c.HTTPConfig.ResponseHeaders
 	if len(c.DeprecatedHTTPAPIResponseHeaders) > 0 {
 		b.deprecate("http_api_response_headers", "http_config.response_headers", "")
+		if httpResponseHeaders == nil {
+			httpResponseHeaders = map[string]string{}
+		}
 		for k, v := range c.DeprecatedHTTPAPIResponseHeaders {
 			httpResponseHeaders[k] = v
 		}
