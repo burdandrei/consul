@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/consul/tlsutil"
 	"github.com/hashicorp/consul/types"
 	discover "github.com/hashicorp/go-discover"
+	"github.com/hashicorp/go-sockaddr/template"
 	"github.com/hashicorp/hcl"
 )
 
@@ -147,13 +148,6 @@ func (b *Builder) ValidateConfig(c Config) error {
 		return fmt.Errorf("autopilot.max_trailing_logs < 0")
 	}
 
-	// if no bind address is given but ports are specified then we bail.
-	// this only affects tests since in prod this gets merged with the
-	// default config which always has a bind address.
-	if c.BindAddr == nil && !reflect.DeepEqual(c.Ports, Ports{}) {
-		return fmt.Errorf("no bind address specified")
-	}
-
 	_, err := tlsutil.ParseCiphers(b.stringVal(c.TLSCipherSuites))
 	if err != nil {
 		return fmt.Errorf("invalid tls cipher suites: %s", err)
@@ -233,7 +227,6 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		dnsServiceTTL[k] = b.durationVal(&v)
 	}
 
-	// todo(fs): services
 	var checks []*structs.CheckDefinition
 	if c.Check != nil {
 		checks = append(checks, b.checkVal(c.Check))
@@ -252,16 +245,33 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 
 	var bindAddrs []string
 	if c.BindAddr != nil {
-		bindAddrs = []string{b.addrVal(c.BindAddr)}
+		bindAddrs = b.ipTemplateVal(c.BindAddr)
 	}
 
-	addrs := func(hosts []string, port int) (addrs []string) {
-		if port > 0 {
-			for _, h := range hosts {
-				addrs = append(addrs, b.joinHostPort(h, port))
+	var clientAddrs []string
+	if c.ClientAddr != nil {
+		clientAddrs = b.ipTemplateVal(c.ClientAddr)
+	}
+
+	addrs := func(addrs []string, overrideAddr *string, port int) []string {
+		if port <= 0 {
+			return nil
+		}
+
+		if b.stringVal(overrideAddr) != "" {
+			addrs = b.ipTemplateVal(overrideAddr)
+		}
+
+		var a []string
+		for _, addr := range addrs {
+			switch {
+			case b.isSocket(addr):
+				a = append(a, addr)
+			default:
+				a = append(a, b.joinHostPort(addr, port))
 			}
 		}
-		return
+		return a
 	}
 
 	// todo(fs): take magic value for "disabled" into account, e.g. 0 or -1
@@ -269,20 +279,19 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	if dnsPort < 0 {
 		dnsPort = 0
 	}
-	dnsAddrsTCP := addrs(bindAddrs, dnsPort)
-	dnsAddrsUDP := addrs(bindAddrs, dnsPort)
+	dnsAddrs := addrs(clientAddrs, c.Addresses.DNS, dnsPort)
 
 	httpPort := b.intVal(c.Ports.HTTP)
 	if httpPort < 0 {
 		httpPort = 0
 	}
-	httpAddrs := addrs(bindAddrs, httpPort)
+	httpAddrs := addrs(clientAddrs, c.Addresses.HTTP, httpPort)
 
 	httpsPort := b.intVal(c.Ports.HTTPS)
 	if httpsPort < 0 {
 		httpsPort = 0
 	}
-	httpsAddrs := addrs(bindAddrs, httpsPort)
+	httpsAddrs := addrs(clientAddrs, c.Addresses.HTTPS, httpsPort)
 
 	// we can ignore the error in ParseCiphers since ValidateConfig has checked this
 	var tlsCipherSuites []uint16
@@ -407,7 +416,6 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	// missing complex stuff
 	if c.AdvertiseAddrLAN != nil ||
 		c.AdvertiseAddrWAN != nil ||
-		!reflect.DeepEqual(Addresses{}, c.Addresses) ||
 		!reflect.DeepEqual(AdvertiseAddrsConfig{}, c.AdvertiseAddrs) ||
 		c.SerfBindAddrLAN != nil ||
 		c.SerfBindAddrWAN != nil ||
@@ -439,8 +447,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		AutopilotUpgradeVersionTag:       b.stringVal(c.Autopilot.UpgradeVersionTag),
 
 		// DNS
-		DNSAddrsTCP:           dnsAddrsTCP,
-		DNSAddrsUDP:           dnsAddrsUDP,
+		DNSAddrs:              dnsAddrs,
 		DNSAllowStale:         b.boolVal(c.DNS.AllowStale),
 		DNSDisableCompression: b.boolVal(c.DNS.DisableCompression),
 		DNSDomain:             b.stringVal(c.DNSDomain),
@@ -497,7 +504,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		CertFile:                    b.stringVal(c.CertFile),
 		CheckUpdateInterval:         b.durationVal(c.CheckUpdateInterval),
 		Checks:                      checks,
-		ClientAddr:                  b.stringVal(c.ClientAddr),
+		ClientAddrs:                 clientAddrs,
 		DataDir:                     b.stringVal(c.DataDir),
 		Datacenter:                  b.stringVal(c.Datacenter),
 		DevMode:                     b.boolVal(b.Flags.DevMode),
@@ -708,12 +715,22 @@ func (b *Builder) stringVal(v *string) string {
 	return *v
 }
 
-func (b *Builder) addrVal(v *string) string {
-	addr := b.stringVal(v)
-	if addr == "" {
-		return "0.0.0.0"
+func (b *Builder) ipTemplateVal(v *string) []string {
+	if b.err != nil || v == nil {
+		return nil
 	}
-	return addr
+
+	s := b.stringVal(v)
+	if s == "" {
+		return []string{"0.0.0.0"}
+	}
+
+	out, err := template.Parse(s)
+	if err != nil {
+		b.err = fmt.Errorf("Unable to parse address template %q: %v", s, err)
+		return nil
+	}
+	return strings.Fields(out)
 }
 
 func (b *Builder) joinHostPort(host string, port int) string {
@@ -721,4 +738,8 @@ func (b *Builder) joinHostPort(host string, port int) string {
 		host = ""
 	}
 	return net.JoinHostPort(host, strconv.Itoa(port))
+}
+
+func (b *Builder) isSocket(s string) bool {
+	return strings.HasPrefix(s, "unix://")
 }

@@ -47,7 +47,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		{
 			desc:  "-client",
 			flags: []string{`-client`, `1.2.3.4`},
-			rt:    RuntimeConfig{ClientAddr: "1.2.3.4"},
+			rt:    RuntimeConfig{ClientAddrs: []string{"1.2.3.4"}},
 		},
 		{
 			desc:  "-data-dir",
@@ -76,12 +76,11 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		},
 		{
 			desc:  "-dns-port",
-			flags: []string{`-dns-port`, `123`, `-bind`, `0.0.0.0`},
+			flags: []string{`-dns-port`, `123`, `-client`, `0.0.0.0`},
 			rt: RuntimeConfig{
-				BindAddrs:   []string{"0.0.0.0"},
+				ClientAddrs: []string{"0.0.0.0"},
 				DNSPort:     123,
-				DNSAddrsUDP: []string{":123"},
-				DNSAddrsTCP: []string{":123"},
+				DNSAddrs:    []string{":123"},
 			},
 		},
 		{
@@ -101,11 +100,11 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		},
 		{
 			desc:  "-http-port",
-			flags: []string{`-http-port`, `123`, `-bind`, `0.0.0.0`},
+			flags: []string{`-http-port`, `123`, `-client`, `0.0.0.0`},
 			rt: RuntimeConfig{
-				BindAddrs: []string{"0.0.0.0"},
-				HTTPPort:  123,
-				HTTPAddrs: []string{":123"},
+				ClientAddrs: []string{"0.0.0.0"},
+				HTTPPort:    123,
+				HTTPAddrs:   []string{":123"},
 			},
 		},
 		{
@@ -461,19 +460,170 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 
 		// ports and addresses
 		{
-			desc: "ports == 0",
-			json: []string{`{ "bind_addr":"0.0.0.0", "ports":{} }`},
-			hcl:  []string{` bind_addr = "0.0.0.0" ports {}`},
+			desc: "client addr and ports == 0",
+			json: []string{`{
+				"client_addr":"0.0.0.0",
+				"ports":{}
+			}`},
+			hcl: []string{`
+				client_addr = "0.0.0.0"
+				ports {}
+			`},
 			rt: RuntimeConfig{
-				BindAddrs: []string{"0.0.0.0"},
+				ClientAddrs: []string{"0.0.0.0"},
 			},
 		},
 		{
-			desc: "ports < 0",
-			json: []string{`{ "bind_addr":"0.0.0.0", "ports":{ "dns":-1, "http":-2, "https":-3 } }`},
-			hcl:  []string{` bind_addr = "0.0.0.0" ports { dns = -1 http = -2 https = -3 }`},
+			desc: "client addr and ports < 0",
+			json: []string{`{
+				"client_addr":"0.0.0.0",
+				"ports": { "dns":-1, "http":-2, "https":-3 }
+			}`},
+			hcl: []string{`
+				client_addr = "0.0.0.0"
+				ports { dns = -1 http = -2 https = -3 }
+			`},
 			rt: RuntimeConfig{
-				BindAddrs: []string{"0.0.0.0"},
+				ClientAddrs: []string{"0.0.0.0"},
+			},
+		},
+		{
+			desc: "client addr and ports < 0",
+			json: []string{`{
+				"client_addr":"0.0.0.0",
+				"ports": { "dns":-1, "http":-2, "https":-3 }
+			}`},
+			hcl: []string{`
+				client_addr = "0.0.0.0"
+				ports { dns = -1 http = -2 https = -3 }
+			`},
+			rt: RuntimeConfig{
+				ClientAddrs: []string{"0.0.0.0"},
+			},
+		},
+		{
+			desc: "client addr and ports > 0",
+			json: []string{`{
+				"client_addr":"0.0.0.0",
+				"ports":{ "dns": 1, "http": 2, "https": 3 }
+			}`},
+			hcl: []string{`
+				client_addr = "0.0.0.0"
+				ports { dns = 1 http = 2 https = 3 }
+			`},
+			rt: RuntimeConfig{
+				ClientAddrs: []string{"0.0.0.0"},
+				DNSPort:     1,
+				HTTPPort:    2,
+				HTTPSPort:   3,
+				DNSAddrs:    []string{":1"},
+				HTTPAddrs:   []string{":2"},
+				HTTPSAddrs:  []string{":3"},
+			},
+		},
+
+		{
+			desc: "client addr, addresses and ports == 0",
+			json: []string{`{
+				"client_addr":"0.0.0.0",
+				"addresses": { "dns": "1.1.1.1", "http": "2.2.2.2", "https": "3.3.3.3" },
+				"ports":{}
+			}`},
+			hcl: []string{`
+				client_addr = "0.0.0.0"
+				addresses = { dns = "1.1.1.1" http = "2.2.2.2" https = "3.3.3.3" }
+				ports {}
+			`},
+			rt: RuntimeConfig{
+				ClientAddrs: []string{"0.0.0.0"},
+			},
+		},
+		{
+			desc: "client addr, addresses and ports < 0",
+			json: []string{`{
+				"client_addr":"0.0.0.0",
+				"addresses": { "dns": "1.1.1.1", "http": "2.2.2.2", "https": "3.3.3.3" },
+				"ports": { "dns":-1, "http":-2, "https":-3 }
+			}`},
+			hcl: []string{`
+				client_addr = "0.0.0.0"
+				addresses = { dns = "1.1.1.1" http = "2.2.2.2" https = "3.3.3.3" }
+				ports { dns = -1 http = -2 https = -3 }
+			`},
+			rt: RuntimeConfig{
+				ClientAddrs: []string{"0.0.0.0"},
+			},
+		},
+		{
+			desc: "client addr, addresses and ports",
+			json: []string{`{
+				"client_addr": "0.0.0.0",
+				"addresses": { "dns": "1.1.1.1", "http": "2.2.2.2", "https": "3.3.3.3" },
+				"ports":{ "dns":1, "http":2, "https":3 }
+			}`},
+			hcl: []string{`
+				client_addr = "0.0.0.0"
+				addresses = { dns = "1.1.1.1" http = "2.2.2.2" https = "3.3.3.3" }
+				ports { dns = 1 http = 2 https = 3 }
+			`},
+			rt: RuntimeConfig{
+				ClientAddrs: []string{"0.0.0.0"},
+				DNSPort:     1,
+				HTTPPort:    2,
+				HTTPSPort:   3,
+				DNSAddrs:    []string{"1.1.1.1:1"},
+				HTTPAddrs:   []string{"2.2.2.2:2"},
+				HTTPSAddrs:  []string{"3.3.3.3:3"},
+			},
+		},
+		{
+			desc: "client template and ports",
+			json: []string{`{
+				"client_addr": "{{ printf \"1.2.3.4 unix://foo 2001:db8::1\" }}",
+				"ports":{ "dns":1, "http":2, "https":3 }
+			}`},
+			hcl: []string{`
+				client_addr = "{{ printf \"1.2.3.4 unix://foo 2001:db8::1\" }}"
+				ports { dns = 1 http = 2 https = 3 }
+			`},
+			rt: RuntimeConfig{
+				ClientAddrs: []string{"1.2.3.4", "unix://foo", "2001:db8::1"},
+				DNSPort:     1,
+				HTTPPort:    2,
+				HTTPSPort:   3,
+				DNSAddrs:    []string{"1.2.3.4:1", "unix://foo", "[2001:db8::1]:1"},
+				HTTPAddrs:   []string{"1.2.3.4:2", "unix://foo", "[2001:db8::1]:2"},
+				HTTPSAddrs:  []string{"1.2.3.4:3", "unix://foo", "[2001:db8::1]:3"},
+			},
+		},
+		{
+			desc: "client, address template and ports",
+			json: []string{`{
+				"client_addr": "{{ printf \"1.2.3.4 unix://foo 2001:db8::1\" }}",
+				"addresses": {
+					"dns": "{{ printf \"1.1.1.1 unix://dns 2001:db8::10 \" }}",
+					"http": "{{ printf \"2.2.2.2 unix://http 2001:db8::20 \" }}",
+					"https": "{{ printf \"3.3.3.3 unix://https 2001:db8::30 \" }}"
+				},
+				"ports":{ "dns":1, "http":2, "https":3 }
+			}`},
+			hcl: []string{`
+				client_addr = "{{ printf \"1.2.3.4 unix://foo 2001:db8::1\" }}"
+				addresses = {
+					dns = "{{ printf \"1.1.1.1 unix://dns 2001:db8::10 \" }}"
+					http = "{{ printf \"2.2.2.2 unix://http 2001:db8::20 \" }}"
+					https = "{{ printf \"3.3.3.3 unix://https 2001:db8::30 \" }}"
+				}
+				ports { dns = 1 http = 2 https = 3 }
+			`},
+			rt: RuntimeConfig{
+				ClientAddrs: []string{"1.2.3.4", "unix://foo", "2001:db8::1"},
+				DNSPort:     1,
+				HTTPPort:    2,
+				HTTPSPort:   3,
+				DNSAddrs:    []string{"1.1.1.1:1", "unix://dns", "[2001:db8::10]:1"},
+				HTTPAddrs:   []string{"2.2.2.2:2", "unix://http", "[2001:db8::20]:2"},
+				HTTPSAddrs:  []string{"3.3.3.3:3", "unix://https", "[2001:db8::30]:3"},
 			},
 		},
 
@@ -599,6 +749,9 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					}
 				}
 				rt, err := b.Build()
+				if err != nil {
+					t.Fatal("Build:", err)
+				}
 
 				if !verify.Values(t, "", rt, tt.rt) {
 					t.FailNow()
@@ -641,6 +794,11 @@ func TestFullConfig(t *testing.T) {
 			"acl_replication_token": "LMmgy5dO",
 			"acl_token": "O1El0wan",
 			"acl_ttl": "18060s",
+			"addresses": {
+				"dns": "kEtdOtsn",
+				"http": "uCOhLXzi",
+				"https": "z4j7tmn2"
+			},
 			"autopilot": {
 				"cleanup_dead_servers": true,
 				"disable_upgrade_migration": true,
@@ -1018,6 +1176,11 @@ func TestFullConfig(t *testing.T) {
 			acl_replication_token = "LMmgy5dO"
 			acl_token = "O1El0wan"
 			acl_ttl = "18060s"
+			addresses = {
+				dns = "kEtdOtsn"
+				http = "uCOhLXzi"
+				https = "z4j7tmn2"
+			}
 			autopilot = {
 				cleanup_dead_servers = true
 				disable_upgrade_migration = true
@@ -1481,9 +1644,8 @@ func TestFullConfig(t *testing.T) {
 			},
 		},
 		CheckUpdateInterval:       16507 * time.Second,
-		ClientAddr:                "e15dFavQ",
-		DNSAddrsTCP:               []string{"6rFPKyh6:7001"},
-		DNSAddrsUDP:               []string{"6rFPKyh6:7001"},
+		ClientAddrs:               []string{"e15dFavQ"},
+		DNSAddrs:                  []string{"kEtdOtsn:7001"},
 		DNSAllowStale:             true,
 		DNSDisableCompression:     true,
 		DNSDomain:                 "7W1xXSqd",
@@ -1513,11 +1675,11 @@ func TestFullConfig(t *testing.T) {
 		EncryptKey:                "A4wELWqH",
 		EncryptVerifyIncoming:     true,
 		EncryptVerifyOutgoing:     true,
-		HTTPAddrs:                 []string{"6rFPKyh6:7999"},
+		HTTPAddrs:                 []string{"uCOhLXzi:7999"},
 		HTTPBlockEndpoints:        []string{"RBvAFcGD", "fWOWFznh"},
 		HTTPPort:                  7999,
 		HTTPResponseHeaders:       map[string]string{"M6TKa9NP": "xjuxjOzQ", "JRCrHZed": "rl0mTx81"},
-		HTTPSAddrs:                []string{"6rFPKyh6:15127"},
+		HTTPSAddrs:                []string{"z4j7tmn2:15127"},
 		HTTPSPort:                 15127,
 		KeyFile:                   "IEkkwgIA",
 		LeaveOnTerm:               true,

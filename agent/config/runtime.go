@@ -134,16 +134,16 @@ type RuntimeConfig struct {
 
 	// address values
 
-	BindAddrs         []string
-	ClientAddr        string
+	BindAddrs   []string
+	ClientAddrs []string
+
 	StartJoinAddrsLAN []string
 	StartJoinAddrsWAN []string
 
 	// server endpoint values
 
-	DNSPort     int
-	DNSAddrsTCP []string
-	DNSAddrsUDP []string
+	DNSPort  int
+	DNSAddrs []string
 
 	HTTPPort  int
 	HTTPAddrs []string
