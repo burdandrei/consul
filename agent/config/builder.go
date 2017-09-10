@@ -325,6 +325,17 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	serfBindAddrLAN := b.singleIPTemplateVal("serf bind lan", c.SerfBindAddrLAN)
 	serfBindAddrWAN := b.singleIPTemplateVal("serf bind wan", c.SerfBindAddrWAN)
 
+	// todo(fs): port SetupTaggedAndAdvertiseAddrs
+	// todo(fs): check ip addrs are valid
+	// todo(fs): check sockets not allowed for advertise and serf bind addrs
+	// todo(fs): port VerifyUniqueListeners
+
+	// todo(fs): port existing validation from command/agent.go
+	// todo(fs): support dev config
+	// todo(fs): validate node_meta data
+	// todo(fs): add new limit and segments
+	// todo(fs): add tests for errors
+
 	// ----------------------------------------------------------------
 	// deprecated fields
 	//
