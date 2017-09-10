@@ -27,6 +27,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		rt               RuntimeConfig
 		warns            []string
 		err              error
+		verr             error
 	}{
 		// ------------------------------------------------------------
 		// cmd line flags
@@ -807,6 +808,18 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			hcl:  []string{`acl_datacenter = "A"`},
 			rt:   RuntimeConfig{ACLDatacenter: "a"},
 		},
+		{
+			desc: "datacenter invalid",
+			json: []string{`{ "datacenter": "%" }`},
+			hcl:  []string{`datacenter = "%"`},
+			verr: errors.New("Datacenter must be alpha-numeric with underscores and hyphens only"),
+		},
+		{
+			desc: "acl_datacenter invalid",
+			json: []string{`{ "datacenter": "a", "acl_datacenter": "%" }`},
+			hcl:  []string{`datacenter = "a" acl_datacenter = "%"`},
+			verr: errors.New("ACL datacenter must be alpha-numeric with underscores and hyphens only"),
+		},
 	}
 
 	for _, tt := range tests {
@@ -851,11 +864,22 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					t.Fatalf("got error %v want %v", got, want)
 				}
 
-				if !verify.Values(t, "", rt, tt.rt) {
-					t.FailNow()
+				if tt.verr != nil {
+					if got, want := b.Validate(rt), tt.verr; !reflect.DeepEqual(got, want) {
+						t.Fatalf("validation error\ngot:  %v\nwant: %v", got, want)
+					}
 				}
 
 				if !verify.Values(t, "warnings", b.Warnings, tt.warns) {
+					t.FailNow()
+				}
+
+				// only validate runtime config if there are no expected errors
+				if tt.verr != nil {
+					return
+				}
+
+				if !verify.Values(t, "", rt, tt.rt) {
 					t.FailNow()
 				}
 			})
@@ -952,8 +976,8 @@ func TestFullConfig(t *testing.T) {
 					"script": "8qbd8tWw",
 					"http": "dohLcyQ2",
 					"header": {
-						"hBq0zn1q": [ "1sDbEqYG", "lJGASsWK" ],
-						"f3r6xFtM": [ "LMccm3Qe", "k5H5RggQ" ]
+						"ZBfTin3L": [ "1sDbEqYG", "lJGASsWK" ],
+						"Ui0nU99X": [ "LMccm3Qe", "k5H5RggQ" ]
 					},
 					"method": "aldrIQ4l",
 					"tcp": "RJQND605",
@@ -1342,8 +1366,8 @@ func TestFullConfig(t *testing.T) {
 					script = "8qbd8tWw"
 					http = "dohLcyQ2"
 					header = {
-						"hBq0zn1q" = [ "1sDbEqYG", "lJGASsWK" ]
-						"f3r6xFtM" = [ "LMccm3Qe", "k5H5RggQ" ]
+						"ZBfTin3L" = [ "1sDbEqYG", "lJGASsWK" ]
+						"Ui0nU99X" = [ "LMccm3Qe", "k5H5RggQ" ]
 					}
 					method = "aldrIQ4l"
 					tcp = "RJQND605"
@@ -1722,8 +1746,8 @@ func TestFullConfig(t *testing.T) {
 				Script:    "8qbd8tWw",
 				HTTP:      "dohLcyQ2",
 				Header: map[string][]string{
-					"hBq0zn1q": []string{"1sDbEqYG", "lJGASsWK"},
-					"f3r6xFtM": []string{"LMccm3Qe", "k5H5RggQ"},
+					"ZBfTin3L": []string{"1sDbEqYG", "lJGASsWK"},
+					"Ui0nU99X": []string{"LMccm3Qe", "k5H5RggQ"},
 				},
 				Method:            "aldrIQ4l",
 				TCP:               "RJQND605",
@@ -1828,26 +1852,28 @@ func TestFullConfig(t *testing.T) {
 				Token:             "myjKJkWH",
 				Port:              72219,
 				EnableTagOverride: true,
-				Check: structs.CheckType{
-					CheckID: "qmfeO5if",
-					Name:    "atDGP7n5",
-					Status:  "pDQKEhWL",
-					Notes:   "Yt8EDLev",
-					Script:  "MDu7wjlD",
-					HTTP:    "qzHYvmJO",
-					Header: map[string][]string{
-						"UkpmZ3a3": {"2dfzXuxZ"},
-						"cVFpko4u": {"gGqdEB6k", "9LsRo22u"},
+				Checks: []*structs.CheckType{
+					&structs.CheckType{
+						CheckID: "qmfeO5if",
+						Name:    "atDGP7n5",
+						Status:  "pDQKEhWL",
+						Notes:   "Yt8EDLev",
+						Script:  "MDu7wjlD",
+						HTTP:    "qzHYvmJO",
+						Header: map[string][]string{
+							"UkpmZ3a3": {"2dfzXuxZ"},
+							"cVFpko4u": {"gGqdEB6k", "9LsRo22u"},
+						},
+						Method:            "X5DrovFc",
+						TCP:               "ICbxkpSF",
+						Interval:          24392 * time.Second,
+						DockerContainerID: "ZKXr68Yb",
+						Shell:             "CEfzx0Fo",
+						TLSSkipVerify:     true,
+						Timeout:           38333 * time.Second,
+						TTL:               57201 * time.Second,
+						DeregisterCriticalServiceAfter: 44214 * time.Second,
 					},
-					Method:            "X5DrovFc",
-					TCP:               "ICbxkpSF",
-					Interval:          24392 * time.Second,
-					DockerContainerID: "ZKXr68Yb",
-					Shell:             "CEfzx0Fo",
-					TLSSkipVerify:     true,
-					Timeout:           38333 * time.Second,
-					TTL:               57201 * time.Second,
-					DeregisterCriticalServiceAfter: 44214 * time.Second,
 				},
 			},
 			{
@@ -1911,27 +1937,6 @@ func TestFullConfig(t *testing.T) {
 				Token:             "msy7iWER",
 				Port:              24237,
 				EnableTagOverride: true,
-				Check: structs.CheckType{
-					CheckID: "RMi85Dv8",
-					Name:    "iehanzuq",
-					Status:  "rCvn53TH",
-					Notes:   "fti5lfF3",
-					Script:  "rtj34nfd",
-					HTTP:    "dl3Fgme3",
-					Header: map[string][]string{
-						"rjm4DEd3": {"2m3m2Fls"},
-						"l4HwQ112": {"fk56MNlo", "dhLK56aZ"},
-					},
-					Method:            "9afLm3Mj",
-					TCP:               "fjiLFqVd",
-					Interval:          23926 * time.Second,
-					DockerContainerID: "dO5TtRHk",
-					Shell:             "e6q2ttES",
-					TLSSkipVerify:     true,
-					Timeout:           38483 * time.Second,
-					TTL:               10943 * time.Second,
-					DeregisterCriticalServiceAfter: 68787 * time.Second,
-				},
 				Checks: structs.CheckTypes{
 					&structs.CheckType{
 						CheckID: "Zv99e9Ka",
@@ -1974,6 +1979,27 @@ func TestFullConfig(t *testing.T) {
 						Timeout:           38282 * time.Second,
 						TTL:               1181 * time.Second,
 						DeregisterCriticalServiceAfter: 4992 * time.Second,
+					},
+					&structs.CheckType{
+						CheckID: "RMi85Dv8",
+						Name:    "iehanzuq",
+						Status:  "rCvn53TH",
+						Notes:   "fti5lfF3",
+						Script:  "rtj34nfd",
+						HTTP:    "dl3Fgme3",
+						Header: map[string][]string{
+							"rjm4DEd3": {"2m3m2Fls"},
+							"l4HwQ112": {"fk56MNlo", "dhLK56aZ"},
+						},
+						Method:            "9afLm3Mj",
+						TCP:               "fjiLFqVd",
+						Interval:          23926 * time.Second,
+						DockerContainerID: "dO5TtRHk",
+						Shell:             "e6q2ttES",
+						TLSSkipVerify:     true,
+						Timeout:           38483 * time.Second,
+						TTL:               10943 * time.Second,
+						DeregisterCriticalServiceAfter: 68787 * time.Second,
 					},
 				},
 			},
@@ -2025,8 +2051,9 @@ func TestFullConfig(t *testing.T) {
 	}
 
 	// ensure that all fields are set to unique non-zero values
+	// todo(fs): This currently fails since ServiceDefinition.Check is not used
 	// if err := nonZero("RuntimeConfig", nil, want); err != nil {
-	// 	t.Fatal(err)
+	// t.Fatal(err)
 	// }
 
 	for format, s := range src {
@@ -2040,7 +2067,7 @@ func TestFullConfig(t *testing.T) {
 
 			// ensure that all fields are set to unique non-zero values
 			// if err := nonZero("Config", nil, cfg); err != nil {
-			// 	t.Fatal(err)
+			// t.Fatal(err)
 			// }
 
 			b := &Builder{Flags: flags, Default: &Config{}}
@@ -2081,7 +2108,7 @@ func nonZero(name string, uniq map[interface{}]string, v interface{}) error {
 
 	isUnique := func(v interface{}) error {
 		if other := uniq[v]; other != "" {
-			return fmt.Errorf("%q and %q use vaule %q", name, other, v)
+			return fmt.Errorf("%q and %q both use vaule %q", name, other, v)
 		}
 		uniq[v] = name
 		return nil
@@ -2119,7 +2146,10 @@ func nonZero(name string, uniq map[interface{}]string, v interface{}) error {
 		for _, key := range val.MapKeys() {
 			keyname := fmt.Sprintf("%s[%s]", name, key.String())
 			if err := nonZero(keyname, uniq, key.Interface()); err != nil {
-				return fmt.Errorf("%q has zero value map key", name)
+				if strings.Contains(err.Error(), "is zero value") {
+					return fmt.Errorf("%q has zero value map key", name)
+				}
+				return err
 			}
 			if err := nonZero(keyname, uniq, val.MapIndex(key).Interface()); err != nil {
 				return err

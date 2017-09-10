@@ -751,14 +751,12 @@ func (b *Builder) serviceVal(v *ServiceDefinition) *structs.ServiceDefinition {
 		return nil
 	}
 
-	var check structs.CheckType
-	if v.Check != nil {
-		check = *b.checkVal(v.Check).CheckType()
-	}
-
 	var checks structs.CheckTypes
 	for _, check := range v.Checks {
 		checks = append(checks, b.checkVal(&check).CheckType())
+	}
+	if v.Check != nil {
+		checks = append(checks, b.checkVal(v.Check).CheckType())
 	}
 
 	return &structs.ServiceDefinition{
@@ -769,7 +767,6 @@ func (b *Builder) serviceVal(v *ServiceDefinition) *structs.ServiceDefinition {
 		Port:              b.intVal(v.Port),
 		Token:             b.stringVal(v.Token),
 		EnableTagOverride: b.boolVal(v.EnableTagOverride),
-		Check:             check,
 		Checks:            checks,
 	}
 }
