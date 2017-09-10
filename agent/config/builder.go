@@ -163,7 +163,10 @@ func (b *Builder) ValidateConfig(c Config) error {
 // warnings can still contain deprecation or format warnigns that should
 // be presented to the user.
 func (b *Builder) Build() (rt RuntimeConfig, err error) {
+	// ----------------------------------------------------------------
 	// validate flags and config fragments
+	//
+
 	if err := b.ValidateConfig(b.Flags.Config); err != nil {
 		return RuntimeConfig{}, err
 	}
@@ -182,7 +185,12 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		}
 	}
 
-	// check deprecated flags
+	// ----------------------------------------------------------------
+	// deprecated flags
+	//
+	// needs to come before merging because of -dc flag
+	//
+
 	if b.Flags.DeprecatedAtlasInfrastructure != nil {
 		b.warn(`'-atlas' is deprecated`)
 	}
@@ -200,7 +208,8 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		b.Flags.Config.Datacenter = b.Flags.DeprecatedDatacenter
 	}
 
-	// config fragments are merged as follows:
+	// ----------------------------------------------------------------
+	// merge config fragments as follows
 	//
 	//   default, files in alphabetical order, flags
 	//
@@ -209,13 +218,17 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	// we need to merge all slice values defined in flags before we
 	// merge the config files since the flag values for slices are
 	// otherwise appended instead of prepended.
+
 	flagSlices, flagValues := b.splitSlicesAndValues(b.Flags.Config)
 	cfgs := []Config{*b.Default, flagSlices}
 	cfgs = append(cfgs, b.Configs...)
 	cfgs = append(cfgs, flagValues)
 	c := Merge(cfgs)
 
+	// ----------------------------------------------------------------
 	// process/merge some complex values
+	//
+
 	var dnsRecursors []string
 	if c.DNSRecursor != nil {
 		dnsRecursors = append(dnsRecursors, b.stringVal(c.DNSRecursor))
@@ -226,6 +239,14 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	for k, v := range c.DNS.ServiceTTL {
 		dnsServiceTTL[k] = b.durationVal(&v)
 	}
+
+	// we can ignore the error in ParseCiphers since ValidateConfig has checked this
+	var tlsCipherSuites []uint16
+	tlsCipherSuites, _ = tlsutil.ParseCiphers(b.stringVal(c.TLSCipherSuites))
+
+	// ----------------------------------------------------------------
+	// checks and services
+	//
 
 	var checks []*structs.CheckDefinition
 	if c.Check != nil {
@@ -243,23 +264,17 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		services = append(services, b.serviceVal(c.Service))
 	}
 
-	var bindAddrs []string
-	if c.BindAddr != nil {
-		bindAddrs = b.ipTemplateVal(c.BindAddr)
-	}
+	// ----------------------------------------------------------------
+	// addresses
+	//
 
-	var clientAddrs []string
-	if c.ClientAddr != nil {
-		clientAddrs = b.ipTemplateVal(c.ClientAddr)
-	}
-
-	addrs := func(addrs []string, overrideAddr *string, port int) []string {
+	addrs := func(name string, addrs []string, overrideAddr *string, port int) []string {
 		if port <= 0 {
 			return nil
 		}
 
 		if b.stringVal(overrideAddr) != "" {
-			addrs = b.ipTemplateVal(overrideAddr)
+			addrs = b.ipTemplateVal(name, overrideAddr)
 		}
 
 		var a []string
@@ -274,30 +289,46 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		return a
 	}
 
+	var bindAddrs []string
+	if c.BindAddr != nil {
+		bindAddrs = b.ipTemplateVal("bind", c.BindAddr)
+	}
+
+	var clientAddrs []string
+	if c.ClientAddr != nil {
+		clientAddrs = b.ipTemplateVal("client", c.ClientAddr)
+	}
+
 	// todo(fs): take magic value for "disabled" into account, e.g. 0 or -1
 	dnsPort := b.intVal(c.Ports.DNS)
 	if dnsPort < 0 {
 		dnsPort = 0
 	}
-	dnsAddrs := addrs(clientAddrs, c.Addresses.DNS, dnsPort)
+	dnsAddrs := addrs("dns", clientAddrs, c.Addresses.DNS, dnsPort)
 
 	httpPort := b.intVal(c.Ports.HTTP)
 	if httpPort < 0 {
 		httpPort = 0
 	}
-	httpAddrs := addrs(clientAddrs, c.Addresses.HTTP, httpPort)
+	httpAddrs := addrs("http", clientAddrs, c.Addresses.HTTP, httpPort)
 
 	httpsPort := b.intVal(c.Ports.HTTPS)
 	if httpsPort < 0 {
 		httpsPort = 0
 	}
-	httpsAddrs := addrs(clientAddrs, c.Addresses.HTTPS, httpsPort)
+	httpsAddrs := addrs("https", clientAddrs, c.Addresses.HTTPS, httpsPort)
 
-	// we can ignore the error in ParseCiphers since ValidateConfig has checked this
-	var tlsCipherSuites []uint16
-	tlsCipherSuites, _ = tlsutil.ParseCiphers(b.stringVal(c.TLSCipherSuites))
+	advertiseAddrLAN := b.singleIPTemplateVal("advertise lan", c.AdvertiseAddrLAN)
+	advertiseAddrWAN := b.singleIPTemplateVal("advertise wan", c.AdvertiseAddrWAN)
+	serfAdvertiseAddrLAN := b.singleIPTemplateVal("serf advertise lan", c.AdvertiseAddrs.SerfLAN)
+	serfAdvertiseAddrWAN := b.singleIPTemplateVal("serf advertise wan", c.AdvertiseAddrs.SerfWAN)
+	serfBindAddrLAN := b.singleIPTemplateVal("serf bind lan", c.SerfBindAddrLAN)
+	serfBindAddrWAN := b.singleIPTemplateVal("serf bind wan", c.SerfBindAddrWAN)
 
+	// ----------------------------------------------------------------
 	// deprecated fields
+	//
+
 	httpResponseHeaders := c.HTTPConfig.ResponseHeaders
 	if len(c.DeprecatedHTTPAPIResponseHeaders) > 0 {
 		b.deprecate("http_api_response_headers", "http_config.response_headers", "")
@@ -414,15 +445,13 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	}
 
 	// missing complex stuff
-	if c.AdvertiseAddrLAN != nil ||
-		c.AdvertiseAddrWAN != nil ||
-		!reflect.DeepEqual(AdvertiseAddrsConfig{}, c.AdvertiseAddrs) ||
-		c.SerfBindAddrLAN != nil ||
-		c.SerfBindAddrWAN != nil ||
-		c.Watches != nil {
+	if c.Watches != nil {
 		panic("add me")
 	}
 
+	// ----------------------------------------------------------------
+	// build runtime config
+	//
 	rt = RuntimeConfig{
 		// ACL
 		ACLAgentMasterToken:  b.stringVal(c.ACLAgentMasterToken),
@@ -496,6 +525,8 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		TelemetryStatsitePrefix:                     statsitePrefix,
 
 		// Agent
+		AdvertiseAddrLAN:            advertiseAddrLAN,
+		AdvertiseAddrWAN:            advertiseAddrWAN,
 		BindAddrs:                   bindAddrs,
 		Bootstrap:                   b.boolVal(c.Bootstrap),
 		BootstrapExpect:             b.intVal(c.BootstrapExpect),
@@ -540,6 +571,10 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		RetryJoinMaxAttemptsLAN:     b.intVal(c.RetryJoinMaxAttemptsLAN),
 		RetryJoinMaxAttemptsWAN:     b.intVal(c.RetryJoinMaxAttemptsWAN),
 		RetryJoinWAN:                c.RetryJoinWAN,
+		SerfAdvertiseAddrLAN:        serfAdvertiseAddrLAN,
+		SerfAdvertiseAddrWAN:        serfAdvertiseAddrWAN,
+		SerfBindAddrLAN:             serfBindAddrLAN,
+		SerfBindAddrWAN:             serfBindAddrWAN,
 		ServerMode:                  b.boolVal(c.ServerMode),
 		ServerName:                  b.stringVal(c.ServerName),
 		Services:                    services,
@@ -554,9 +589,9 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		TaggedAddresses:             c.TaggedAddresses,
 		TranslateWANAddrs:           b.boolVal(c.TranslateWANAddrs),
 		UIDir:                       b.stringVal(c.UIDir),
-		UnixSocketUser:              b.stringVal(c.UnixSocket.User),
 		UnixSocketGroup:             b.stringVal(c.UnixSocket.Group),
 		UnixSocketMode:              b.stringVal(c.UnixSocket.Mode),
+		UnixSocketUser:              b.stringVal(c.UnixSocket.User),
 		VerifyIncoming:              b.boolVal(c.VerifyIncoming),
 		VerifyIncomingHTTPS:         b.boolVal(c.VerifyIncomingHTTPS),
 		VerifyIncomingRPC:           b.boolVal(c.VerifyIncomingRPC),
@@ -715,7 +750,19 @@ func (b *Builder) stringVal(v *string) string {
 	return *v
 }
 
-func (b *Builder) ipTemplateVal(v *string) []string {
+func (b *Builder) singleIPTemplateVal(name string, v *string) string {
+	s := b.ipTemplateVal(name, v)
+	if b.err != nil || len(s) == 0 {
+		return ""
+	}
+	if len(s) != 1 {
+		b.err = fmt.Errorf("%s: multiple addresses configured: %v", name, s)
+		return ""
+	}
+	return s[0]
+}
+
+func (b *Builder) ipTemplateVal(name string, v *string) []string {
 	if b.err != nil || v == nil {
 		return nil
 	}
@@ -727,7 +774,7 @@ func (b *Builder) ipTemplateVal(v *string) []string {
 
 	out, err := template.Parse(s)
 	if err != nil {
-		b.err = fmt.Errorf("Unable to parse address template %q: %v", s, err)
+		b.err = fmt.Errorf("%s: unable to parse address template %q: %v", name, s, err)
 		return nil
 	}
 	return strings.Fields(out)

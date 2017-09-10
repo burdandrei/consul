@@ -140,6 +140,13 @@ type RuntimeConfig struct {
 	StartJoinAddrsLAN []string
 	StartJoinAddrsWAN []string
 
+	AdvertiseAddrLAN     string
+	AdvertiseAddrWAN     string
+	SerfAdvertiseAddrLAN string
+	SerfAdvertiseAddrWAN string
+	SerfBindAddrLAN      string
+	SerfBindAddrWAN      string
+
 	// server endpoint values
 
 	DNSPort  int

@@ -30,6 +30,16 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 	}{
 		// cmd line flags
 		{
+			desc:  "-advertise",
+			flags: []string{`-advertise`, `a`},
+			rt:    RuntimeConfig{AdvertiseAddrLAN: "a"},
+		},
+		{
+			desc:  "-advertise-wan",
+			flags: []string{`-advertise-wan`, `a`},
+			rt:    RuntimeConfig{AdvertiseAddrWAN: "a"},
+		},
+		{
 			desc:  "-bind",
 			flags: []string{`-bind`, `1.2.3.4`},
 			rt:    RuntimeConfig{BindAddrs: []string{"1.2.3.4"}},
@@ -198,6 +208,16 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			rt:    RuntimeConfig{RetryJoinMaxAttemptsWAN: 1},
 		},
 		{
+			desc:  "-serf-lan-bind",
+			flags: []string{`-serf-lan-bind`, `a`},
+			rt:    RuntimeConfig{SerfBindAddrLAN: "a"},
+		},
+		{
+			desc:  "-serf-wan-bind",
+			flags: []string{`-serf-wan-bind`, `a`},
+			rt:    RuntimeConfig{SerfBindAddrWAN: "a"},
+		},
+		{
 			desc:  "-server",
 			flags: []string{`-server`},
 			rt:    RuntimeConfig{ServerMode: true},
@@ -217,12 +237,6 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			flags: []string{`-ui-dir`, `a`},
 			rt:    RuntimeConfig{UIDir: "a"},
 		},
-		/*
-			add(&f.Config.AdvertiseAddrLAN, "advertise", "Sets the advertise address to use.")
-			add(&f.Config.AdvertiseAddrWAN, "advertise-wan", "Sets address to advertise on WAN instead of -advertise address.")
-			add(&f.Config.SerfBindAddrLAN, "serf-lan-bind", "Address to bind Serf LAN listeners to.")
-			add(&f.Config.SerfBindAddrWAN, "serf-wan-bind", "Address to bind Serf WAN listeners to.")
-		*/
 
 		// deprecated flags
 		{
@@ -626,6 +640,42 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				HTTPSAddrs:  []string{"3.3.3.3:3", "unix://https", "[2001:db8::30]:3"},
 			},
 		},
+		{
+			desc: "advertise address lan template",
+			json: []string{`{ "advertise_addr": "{{ printf \"1.2.3.4\" }}" }`},
+			hcl:  []string{`advertise_addr = "{{ printf \"1.2.3.4\" }}"`},
+			rt:   RuntimeConfig{AdvertiseAddrLAN: "1.2.3.4"},
+		},
+		{
+			desc: "advertise address wan template",
+			json: []string{`{ "advertise_addr_wan": "{{ printf \"1.2.3.4\" }}" }`},
+			hcl:  []string{`advertise_addr_wan = "{{ printf \"1.2.3.4\" }}"`},
+			rt:   RuntimeConfig{AdvertiseAddrWAN: "1.2.3.4"},
+		},
+		{
+			desc: "serf advertise address lan template",
+			json: []string{`{ "advertise_addrs": { "serf_lan": "{{ printf \"1.2.3.4\" }}" } }`},
+			hcl:  []string{`advertise_addrs = { serf_lan = "{{ printf \"1.2.3.4\" }}" }`},
+			rt:   RuntimeConfig{SerfAdvertiseAddrLAN: "1.2.3.4"},
+		},
+		{
+			desc: "serf advertise address wan template",
+			json: []string{`{ "advertise_addrs": { "serf_wan": "{{ printf \"1.2.3.4\" }}" } }`},
+			hcl:  []string{`advertise_addrs = { serf_wan = "{{ printf \"1.2.3.4\" }}" }`},
+			rt:   RuntimeConfig{SerfAdvertiseAddrWAN: "1.2.3.4"},
+		},
+		{
+			desc: "serf bind address lan template",
+			json: []string{`{ "serf_lan": "{{ printf \"1.2.3.4\" }}" }`},
+			hcl:  []string{`serf_lan = "{{ printf \"1.2.3.4\" }}"`},
+			rt:   RuntimeConfig{SerfBindAddrLAN: "1.2.3.4"},
+		},
+		{
+			desc: "serf bind address wan template",
+			json: []string{`{ "serf_wan": "{{ printf \"1.2.3.4\" }}" }`},
+			hcl:  []string{`serf_wan = "{{ printf \"1.2.3.4\" }}"`},
+			rt:   RuntimeConfig{SerfBindAddrWAN: "1.2.3.4"},
+		},
 
 		// precedence rules
 		{
@@ -674,39 +724,55 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			desc: "precedence: flag before file",
 			json: []string{
 				`{
+					"advertise_addr": "a",
+					"advertise_addr_wan": "a",
 					"bootstrap":true,
 					"bootstrap_expect": 1,
 					"datacenter":"a",
+					"node_meta": {"a":"b"},
 					"recursors":["a", "b"],
-					"start_join":["a", "b"],
-					"node_meta": {"a":"b"}
+					"serf_lan": "a",
+					"serf_wan": "a",
+					"start_join":["a", "b"]
 				}`,
 			},
 			hcl: []string{
 				`
+				advertise_addr = "a"
+				advertise_addr_wan = "a"
 				bootstrap = true
 				bootstrap_expect = 1
 				datacenter = "a"
-				recursors = ["a", "b"]
-				start_join = ["a", "b"]
 				node_meta = { "a" = "b" }
+				recursors = ["a", "b"]
+				serf_lan = "a"
+				serf_wan = "a"
+				start_join = ["a", "b"]
 				`,
 			},
 			flags: []string{
+				`-advertise`, `b`,
+				`-advertise-wan`, `b`,
 				`-bootstrap=false`,
 				`-bootstrap-expect=2`,
 				`-datacenter=b`,
 				`-join`, `c`, `-join`, `d`,
 				`-node-meta`, `c:d`,
 				`-recursor`, `c`, `-recursor`, `d`,
+				`-serf-lan-bind`, `b`,
+				`-serf-wan-bind`, `b`,
 			},
 			rt: RuntimeConfig{
+				AdvertiseAddrLAN:  "b",
+				AdvertiseAddrWAN:  "b",
 				Bootstrap:         false,
 				BootstrapExpect:   2,
 				Datacenter:        "b",
-				StartJoinAddrsLAN: []string{"c", "d", "a", "b"},
-				NodeMeta:          map[string]string{"c": "d"},
 				DNSRecursors:      []string{"c", "d", "a", "b"},
+				NodeMeta:          map[string]string{"c": "d"},
+				SerfBindAddrLAN:   "b",
+				SerfBindAddrWAN:   "b",
+				StartJoinAddrsLAN: []string{"c", "d", "a", "b"},
 			},
 		},
 	}
@@ -749,8 +815,8 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					}
 				}
 				rt, err := b.Build()
-				if err != nil {
-					t.Fatal("Build:", err)
+				if got, want := err, tt.err; !reflect.DeepEqual(got, want) {
+					t.Fatalf("got error %v want %v", got, want)
 				}
 
 				if !verify.Values(t, "", rt, tt.rt) {
@@ -798,6 +864,12 @@ func TestFullConfig(t *testing.T) {
 				"dns": "kEtdOtsn",
 				"http": "uCOhLXzi",
 				"https": "z4j7tmn2"
+			},
+			"advertise_addr": "zkCS5pci",
+			"advertise_addr_wan": "587rk4R8",
+			"advertise_addrs": {
+				"serf_lan": "XPYfEKBY",
+				"serf_wan": "53wnhkCC"
 			},
 			"autopilot": {
 				"cleanup_dead_servers": true,
@@ -956,6 +1028,8 @@ func TestFullConfig(t *testing.T) {
 			"retry_join_wan": [ "PFsR02Ye", "rJdQIhER" ],
 			"retry_max": 913,
 			"retry_max_wan": 23160,
+			"serf_lan": "bdJGdMtR",
+			"serf_wan": "rSfygrZH",
 			"server": true,
 			"server_name": "Oerr9n1G",
 			"service": {
@@ -1181,6 +1255,12 @@ func TestFullConfig(t *testing.T) {
 				http = "uCOhLXzi"
 				https = "z4j7tmn2"
 			}
+			advertise_addr = "zkCS5pci"
+			advertise_addr_wan = "587rk4R8"
+			advertise_addrs = {
+				serf_lan = "XPYfEKBY"
+				serf_wan = "53wnhkCC"
+			}
 			autopilot = {
 				cleanup_dead_servers = true
 				disable_upgrade_migration = true
@@ -1338,6 +1418,8 @@ func TestFullConfig(t *testing.T) {
 			retry_join_wan = [ "PFsR02Ye", "rJdQIhER" ]
 			retry_max = 913
 			retry_max_wan = 23160
+			serf_lan = "bdJGdMtR"
+			serf_wan = "rSfygrZH"
 			server = true
 			server_name = "Oerr9n1G"
 			service = {
@@ -1559,6 +1641,8 @@ func TestFullConfig(t *testing.T) {
 		ACLReplicationToken:              "LMmgy5dO",
 		ACLTTL:                           18060 * time.Second,
 		ACLToken:                         "O1El0wan",
+		AdvertiseAddrLAN:                 "zkCS5pci",
+		AdvertiseAddrWAN:                 "587rk4R8",
 		AutopilotCleanupDeadServers:      true,
 		AutopilotDisableUpgradeMigration: true,
 		AutopilotLastContactThreshold:    12705 * time.Second,
@@ -1862,6 +1946,10 @@ func TestFullConfig(t *testing.T) {
 				},
 			},
 		},
+		SerfAdvertiseAddrLAN:                        "XPYfEKBY",
+		SerfAdvertiseAddrWAN:                        "53wnhkCC",
+		SerfBindAddrLAN:                             "bdJGdMtR",
+		SerfBindAddrWAN:                             "rSfygrZH",
 		SessionTTLMin:                               26627 * time.Second,
 		SkipLeaveOnInt:                              true,
 		StartJoinAddrsLAN:                           []string{"LR3hGDoG", "MwVpZ4Up"},
