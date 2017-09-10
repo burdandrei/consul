@@ -24,7 +24,7 @@ type RuntimeConfig struct {
 	AutopilotCleanupDeadServers      bool
 	AutopilotDisableUpgradeMigration bool
 	AutopilotLastContactThreshold    time.Duration
-	AutopilotMaxTrailingLogs         uint64
+	AutopilotMaxTrailingLogs         int64
 	AutopilotRedundancyZoneTag       string
 	AutopilotServerStabilizationTime time.Duration
 	AutopilotUpgradeVersionTag       string

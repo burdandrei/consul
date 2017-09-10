@@ -141,7 +141,7 @@ type Autopilot struct {
 	DisableUpgradeMigration *bool   `json:"disable_upgrade_migration" hcl:"disable_upgrade_migration"`
 	LastContactThreshold    *string `json:"last_contact_threshold" hcl:"last_contact_threshold"`
 	// todo(fs): do we need uint64 here? If yes, then I need to write a special parser b/c of JSON limit of 2^53-1 for ints
-	MaxTrailingLogs         *int    `json:"max_trailing_logs" hcl:"max_trailing_logs"`
+	MaxTrailingLogs         *int64  `json:"max_trailing_logs" hcl:"max_trailing_logs"`
 	RedundancyZoneTag       *string `json:"redundancy_zone_tag" hcl:"redundancy_zone_tag"`
 	ServerStabilizationTime *string `json:"server_stabilization_time" hcl:"server_stabilization_time"`
 	UpgradeVersionTag       *string `json:"upgrade_version_tag" hcl:"upgrade_version_tag"`
