@@ -7,12 +7,14 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/hashicorp/consul/agent/structs"
+	"github.com/hashicorp/consul/ipaddr"
 	"github.com/hashicorp/consul/tlsutil"
 	"github.com/hashicorp/consul/types"
 	discover "github.com/hashicorp/go-discover"
@@ -135,24 +137,7 @@ func (b *Builder) ReadBytes(data []byte, format string) error {
 // configuration to the list of config fragments from which the runtime
 // configuration is built.
 func (b *Builder) AppendConfig(c Config) error {
-	if err := b.ValidateConfig(c); err != nil {
-		return err
-	}
 	b.Configs = append(b.Configs, c)
-	return nil
-}
-
-// ValidateConfig checks the configuration for non-recoverable errors.
-func (b *Builder) ValidateConfig(c Config) error {
-	if b.intVal(c.Autopilot.MaxTrailingLogs) < 0 {
-		return fmt.Errorf("autopilot.max_trailing_logs < 0")
-	}
-
-	_, err := tlsutil.ParseCiphers(b.stringVal(c.TLSCipherSuites))
-	if err != nil {
-		return fmt.Errorf("invalid tls cipher suites: %s", err)
-	}
-
 	return nil
 }
 
@@ -163,28 +148,6 @@ func (b *Builder) ValidateConfig(c Config) error {
 // warnings can still contain deprecation or format warnigns that should
 // be presented to the user.
 func (b *Builder) Build() (rt RuntimeConfig, err error) {
-	// ----------------------------------------------------------------
-	// validate flags and config fragments
-	//
-
-	if err := b.ValidateConfig(b.Flags.Config); err != nil {
-		return RuntimeConfig{}, err
-	}
-	if b.Default == nil {
-		b.Default = &defaultConfig
-		if b.boolVal(b.Flags.DevMode) {
-			b.Default = &defaultDevConfig
-		}
-	}
-	if err := b.ValidateConfig(*b.Default); err != nil {
-		return RuntimeConfig{}, err
-	}
-	for _, c := range b.Configs {
-		if err := b.ValidateConfig(c); err != nil {
-			return RuntimeConfig{}, err
-		}
-	}
-
 	// ----------------------------------------------------------------
 	// deprecated flags
 	//
@@ -219,6 +182,13 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	// merge the config files since the flag values for slices are
 	// otherwise appended instead of prepended.
 
+	if b.Default == nil {
+		b.Default = &defaultConfig
+		if b.boolVal(b.Flags.DevMode) {
+			b.Default = &defaultDevConfig
+		}
+	}
+
 	flagSlices, flagValues := b.splitSlicesAndValues(b.Flags.Config)
 	cfgs := []Config{*b.Default, flagSlices}
 	cfgs = append(cfgs, b.Configs...)
@@ -240,9 +210,11 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		dnsServiceTTL[k] = b.durationVal(&v)
 	}
 
-	// we can ignore the error in ParseCiphers since ValidateConfig has checked this
 	var tlsCipherSuites []uint16
-	tlsCipherSuites, _ = tlsutil.ParseCiphers(b.stringVal(c.TLSCipherSuites))
+	tlsCipherSuites, err = tlsutil.ParseCiphers(b.stringVal(c.TLSCipherSuites))
+	if err != nil {
+		return RuntimeConfig{}, fmt.Errorf("invalid tls cipher suites: %s", err)
+	}
 
 	// ----------------------------------------------------------------
 	// checks and services
@@ -467,7 +439,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		// ACL
 		ACLAgentMasterToken:  b.stringVal(c.ACLAgentMasterToken),
 		ACLAgentToken:        b.stringVal(c.ACLAgentToken),
-		ACLDatacenter:        b.stringVal(c.ACLDatacenter),
+		ACLDatacenter:        strings.ToLower(b.stringVal(c.ACLDatacenter)),
 		ACLDefaultPolicy:     b.stringVal(c.ACLDefaultPolicy),
 		ACLDownPolicy:        b.stringVal(c.ACLDownPolicy),
 		ACLEnforceVersion8:   b.boolVal(c.ACLEnforceVersion8),
@@ -548,7 +520,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		Checks:                      checks,
 		ClientAddrs:                 clientAddrs,
 		DataDir:                     b.stringVal(c.DataDir),
-		Datacenter:                  b.stringVal(c.Datacenter),
+		Datacenter:                  strings.ToLower(b.stringVal(c.Datacenter)),
 		DevMode:                     b.boolVal(b.Flags.DevMode),
 		DisableAnonymousSignature:   b.boolVal(c.DisableAnonymousSignature),
 		DisableCoordinates:          b.boolVal(c.DisableCoordinates),
@@ -611,6 +583,83 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	}
 
 	return rt, b.err
+}
+
+// Validate checks the configuration for non-recoverable errors.
+func (b *Builder) Validate(rt RuntimeConfig) error {
+
+	if rt.AutopilotMaxTrailingLogs < 0 {
+		return fmt.Errorf("autopilot.max_trailing_logs < 0")
+	}
+
+	// validDatacenter is used to validate a datacenter
+	var validDatacenter = regexp.MustCompile("^[a-z0-9_-]+$")
+
+	if !validDatacenter.MatchString(rt.Datacenter) {
+		return fmt.Errorf("Datacenter must be alpha-numeric with underscores and hyphens only")
+	}
+
+	if rt.ACLDatacenter != "" && !validDatacenter.MatchString(rt.ACLDatacenter) {
+		return fmt.Errorf("ACL datacenter must be alpha-numeric with underscores and hyphens only")
+	}
+
+	if rt.Bootstrap && !rt.ServerMode {
+		return fmt.Errorf("Bootstrap mode requires Server mode")
+	}
+
+	if rt.BootstrapExpect < 0 {
+		return fmt.Errorf("BootstrapExpect cannot be negative")
+	}
+
+	if rt.BootstrapExpect > 0 && !rt.ServerMode {
+		return fmt.Errorf("BootstrapExpect mode requires Server mode")
+	}
+
+	if rt.BootstrapExpect > 0 && rt.DevMode {
+		return fmt.Errorf("BootstrapExpect mode cannot be enabled in dev mode")
+	}
+
+	if rt.BootstrapExpect > 0 && rt.Bootstrap {
+		return fmt.Errorf("BootstrapExpect mode and Bootstrap mode are mutually exclusive")
+	}
+
+	if rt.BootstrapExpect == 1 {
+		rt.Bootstrap = true
+		rt.BootstrapExpect = 0
+		b.warn("BootstrapExpect is set to 1; this is the same as Bootstrap mode.")
+	}
+
+	if rt.BootstrapExpect > 1 {
+		b.warn("BootstrapExpect mode enabled, expecting %d servers", rt.BootstrapExpect)
+	}
+	if rt.BootstrapExpect == 2 {
+		b.warn("A cluster with 2 servers will provide no failure tolerance.  See https://www.consul.io/docs/internals/consensus.html#deployment-table")
+	}
+
+	if rt.BootstrapExpect > 2 && rt.BootstrapExpect%2 == 0 {
+		b.warn("A cluster with an even number of servers does not achieve optimum fault tolerance.  See https://www.consul.io/docs/internals/consensus.html#deployment-table")
+	}
+
+	if rt.Bootstrap {
+		b.warn("Bootstrap mode enabled! Do not enable unless necessary")
+	}
+
+	if rt.EnableUI && rt.UIDir != "" {
+		return fmt.Errorf(
+			"Both the ui and ui-dir flags were specified, please provide only one.\n" +
+				"If trying to use your own web UI resources, use the ui-dir flag.\n" +
+				"If using Consul version 0.7.0 or later, the web UI is included in the binary so use ui to enable it")
+	}
+
+	if ipaddr.IsAny(rt.AdvertiseAddrLAN) {
+		return fmt.Errorf("Advertise address cannot be %s", rt.AdvertiseAddrLAN)
+	}
+
+	if ipaddr.IsAny(rt.AdvertiseAddrWAN) {
+		return fmt.Errorf("Advertise WAN address cannot be %s", rt.AdvertiseAddrWAN)
+	}
+
+	return nil
 }
 
 // splitSlicesAndValues moves all slice values defined in c to 'slices'

@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strings"
 	"syscall"
@@ -19,13 +18,10 @@ import (
 	"github.com/armon/go-metrics/datadog"
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/agent/structs"
-	"github.com/hashicorp/consul/configutil"
-	"github.com/hashicorp/consul/ipaddr"
 	"github.com/hashicorp/consul/lib"
 	"github.com/hashicorp/consul/logger"
 	"github.com/hashicorp/consul/watch"
 	"github.com/hashicorp/go-checkpoint"
-	discover "github.com/hashicorp/go-discover"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/logutils"
 	"github.com/mitchellh/cli"
@@ -64,160 +60,160 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 
 	f := cmd.BaseCommand.NewFlagSet(cmd)
 
-	f.Var((*configutil.AppendSliceValue)(&cfgFiles), "config-file",
-		"Path to a JSON file to read configuration from. This can be specified multiple times.")
-	f.Var((*configutil.AppendSliceValue)(&cfgFiles), "config-dir",
-		"Path to a directory to read configuration files from. This will read every file ending "+
-			"in '.json' as configuration in this directory in alphabetical order. This can be "+
-			"specified multiple times.")
-	f.Var((*configutil.AppendSliceValue)(&dnsRecursors), "recursor",
-		"Address of an upstream DNS server. Can be specified multiple times.")
-	f.Var((*configutil.AppendSliceValue)(&nodeMeta), "node-meta",
-		"An arbitrary metadata key/value pair for this node, of the format `key:value`. Can be specified multiple times.")
-	f.BoolVar(&dev, "dev", false, "Starts the agent in development mode.")
+	// done: f.Var((*configutil.AppendSliceValue)(&cfgFiles), "config-file",
+	// done: 	"Path to a JSON file to read configuration from. This can be specified multiple times.")
+	// done: f.Var((*configutil.AppendSliceValue)(&cfgFiles), "config-dir",
+	// done: 	"Path to a directory to read configuration files from. This will read every file ending "+
+	// done: 		"in '.json' as configuration in this directory in alphabetical order. This can be "+
+	// done: 		"specified multiple times.")
+	// done: f.Var((*configutil.AppendSliceValue)(&dnsRecursors), "recursor",
+	// done: 	"Address of an upstream DNS server. Can be specified multiple times.")
+	// done: f.Var((*configutil.AppendSliceValue)(&nodeMeta), "node-meta",
+	// done: 	"An arbitrary metadata key/value pair for this node, of the format `key:value`. Can be specified multiple times.")
+	// done: f.BoolVar(&dev, "dev", false, "Starts the agent in development mode.")
 
-	f.StringVar(&cmdCfg.LogLevel, "log-level", "", "Log level of the agent.")
-	f.StringVar(&cmdCfg.NodeName, "node", "", "Name of this node. Must be unique in the cluster.")
-	f.StringVar((*string)(&cmdCfg.NodeID), "node-id", "",
-		"A unique ID for this node across space and time. Defaults to a randomly-generated ID"+
-			" that persists in the data-dir.")
+	// done: f.StringVar(&cmdCfg.LogLevel, "log-level", "", "Log level of the agent.")
+	// done: f.StringVar(&cmdCfg.NodeName, "node", "", "Name of this node. Must be unique in the cluster.")
+	// done: f.StringVar((*string)(&cmdCfg.NodeID), "node-id", "",
+	// done: 	"A unique ID for this node across space and time. Defaults to a randomly-generated ID"+
+	// done: 		" that persists in the data-dir.")
 
-	f.BoolVar(&cmdCfg.EnableScriptChecks, "enable-script-checks", false, "Enables health check scripts.")
-	var disableHostNodeID configutil.BoolValue
-	f.Var(&disableHostNodeID, "disable-host-node-id",
-		"Setting this to true will prevent Consul from using information from the"+
-			" host to generate a node ID, and will cause Consul to generate a"+
-			" random node ID instead.")
+	// done: f.BoolVar(&cmdCfg.EnableScriptChecks, "enable-script-checks", false, "Enables health check scripts.")
+	// done: var disableHostNodeID configutil.BoolValue
+	// done: f.Var(&disableHostNodeID, "disable-host-node-id",
+	// done: 	"Setting this to true will prevent Consul from using information from the"+
+	// done: 		" host to generate a node ID, and will cause Consul to generate a"+
+	// done: 		" random node ID instead.")
 
-	f.StringVar(&cmdCfg.Datacenter, "datacenter", "", "Datacenter of the agent.")
-	f.StringVar(&cmdCfg.DataDir, "data-dir", "", "Path to a data directory to store agent state.")
-	f.BoolVar(&cmdCfg.EnableUI, "ui", false, "Enables the built-in static web UI server.")
-	f.StringVar(&cmdCfg.UIDir, "ui-dir", "", "Path to directory containing the web UI resources.")
-	f.StringVar(&cmdCfg.PidFile, "pid-file", "", "Path to file to store agent PID.")
-	f.StringVar(&cmdCfg.EncryptKey, "encrypt", "", "Provides the gossip encryption key.")
-	f.BoolVar(&cmdCfg.DisableKeyringFile, "disable-keyring-file", false, "Disables the backing up "+
-		"of the keyring to a file.")
+	// done: f.StringVar(&cmdCfg.Datacenter, "datacenter", "", "Datacenter of the agent.")
+	// done: f.StringVar(&cmdCfg.DataDir, "data-dir", "", "Path to a data directory to store agent state.")
+	// done: f.BoolVar(&cmdCfg.EnableUI, "ui", false, "Enables the built-in static web UI server.")
+	// done: f.StringVar(&cmdCfg.UIDir, "ui-dir", "", "Path to directory containing the web UI resources.")
+	// done: f.StringVar(&cmdCfg.PidFile, "pid-file", "", "Path to file to store agent PID.")
+	// done: f.StringVar(&cmdCfg.EncryptKey, "encrypt", "", "Provides the gossip encryption key.")
+	// done: f.BoolVar(&cmdCfg.DisableKeyringFile, "disable-keyring-file", false, "Disables the backing up "+
+	// done: 	"of the keyring to a file.")
 
-	f.BoolVar(&cmdCfg.Server, "server", false, "Switches agent to server mode.")
-	f.BoolVar(&cmdCfg.NonVotingServer, "non-voting-server", false,
-		"(Enterprise-only) This flag is used to make the server not participate in the Raft quorum, "+
-			"and have it only receive the data replication stream. This can be used to add read scalability "+
-			"to a cluster in cases where a high volume of reads to servers are needed.")
-	f.BoolVar(&cmdCfg.Bootstrap, "bootstrap", false, "Sets server to bootstrap mode.")
-	f.IntVar(&cmdCfg.BootstrapExpect, "bootstrap-expect", 0, "Sets server to expect bootstrap mode.")
-	f.StringVar(&cmdCfg.Domain, "domain", "", "Domain to use for DNS interface.")
+	// done: f.BoolVar(&cmdCfg.Server, "server", false, "Switches agent to server mode.")
+	// done: f.BoolVar(&cmdCfg.NonVotingServer, "non-voting-server", false,
+	// done: 	"(Enterprise-only) This flag is used to make the server not participate in the Raft quorum, "+
+	// done: 		"and have it only receive the data replication stream. This can be used to add read scalability "+
+	// done: 		"to a cluster in cases where a high volume of reads to servers are needed.")
+	// done: f.BoolVar(&cmdCfg.Bootstrap, "bootstrap", false, "Sets server to bootstrap mode.")
+	// done: f.IntVar(&cmdCfg.BootstrapExpect, "bootstrap-expect", 0, "Sets server to expect bootstrap mode.")
+	// done: f.StringVar(&cmdCfg.Domain, "domain", "", "Domain to use for DNS interface.")
 
-	f.StringVar(&cmdCfg.ClientAddr, "client", "",
-		"Sets the address to bind for client access. This includes RPC, DNS, HTTP and HTTPS (if configured).")
-	f.StringVar(&cmdCfg.BindAddr, "bind", "", "Sets the bind address for cluster communication.")
-	f.StringVar(&cmdCfg.SerfWanBindAddr, "serf-wan-bind", "", "Address to bind Serf WAN listeners to.")
-	f.StringVar(&cmdCfg.SerfLanBindAddr, "serf-lan-bind", "", "Address to bind Serf LAN listeners to.")
-	f.IntVar(&cmdCfg.Ports.HTTP, "http-port", 0, "Sets the HTTP API port to listen on.")
-	f.IntVar(&cmdCfg.Ports.DNS, "dns-port", 0, "DNS port to use.")
-	f.StringVar(&cmdCfg.AdvertiseAddr, "advertise", "", "Sets the advertise address to use.")
-	f.StringVar(&cmdCfg.AdvertiseAddrWan, "advertise-wan", "",
-		"Sets address to advertise on WAN instead of -advertise address.")
-	f.StringVar(&cmdCfg.Segment, "segment", "", "(Enterprise-only) Sets the network segment to join.")
+	// done: f.StringVar(&cmdCfg.ClientAddr, "client", "",
+	// done: 	"Sets the address to bind for client access. This includes RPC, DNS, HTTP and HTTPS (if configured).")
+	// done: f.StringVar(&cmdCfg.BindAddr, "bind", "", "Sets the bind address for cluster communication.")
+	// done: f.StringVar(&cmdCfg.SerfWanBindAddr, "serf-wan-bind", "", "Address to bind Serf WAN listeners to.")
+	// done: f.StringVar(&cmdCfg.SerfLanBindAddr, "serf-lan-bind", "", "Address to bind Serf LAN listeners to.")
+	// done: f.IntVar(&cmdCfg.Ports.HTTP, "http-port", 0, "Sets the HTTP API port to listen on.")
+	// done: f.IntVar(&cmdCfg.Ports.DNS, "dns-port", 0, "DNS port to use.")
+	// done: f.StringVar(&cmdCfg.AdvertiseAddr, "advertise", "", "Sets the advertise address to use.")
+	// done: f.StringVar(&cmdCfg.AdvertiseAddrWan, "advertise-wan", "",
+	// done: 	"Sets address to advertise on WAN instead of -advertise address.")
+	// done: f.StringVar(&cmdCfg.Segment, "segment", "", "(Enterprise-only) Sets the network segment to join.")
 
-	f.IntVar(&cmdCfg.Protocol, "protocol", -1,
-		"Sets the protocol version. Defaults to latest.")
-	f.IntVar(&cmdCfg.RaftProtocol, "raft-protocol", -1,
-		"Sets the Raft protocol version. Defaults to latest.")
+	// done: f.IntVar(&cmdCfg.Protocol, "protocol", -1,
+	// done: 	"Sets the protocol version. Defaults to latest.")
+	// done: f.IntVar(&cmdCfg.RaftProtocol, "raft-protocol", -1,
+	// done: 	"Sets the Raft protocol version. Defaults to latest.")
 
-	f.BoolVar(&cmdCfg.EnableSyslog, "syslog", false,
-		"Enables logging to syslog.")
-	f.BoolVar(&cmdCfg.RejoinAfterLeave, "rejoin", false,
-		"Ignores a previous leave and attempts to rejoin the cluster.")
-	f.Var((*configutil.AppendSliceValue)(&cmdCfg.StartJoin), "join",
-		"Address of an agent to join at start time. Can be specified multiple times.")
-	f.Var((*configutil.AppendSliceValue)(&cmdCfg.StartJoinWan), "join-wan",
-		"Address of an agent to join -wan at start time. Can be specified multiple times.")
-	f.Var((*configutil.AppendSliceValue)(&cmdCfg.RetryJoin), "retry-join",
-		"Address of an agent to join at start time with retries enabled. Can be specified multiple times.")
-	f.IntVar(&cmdCfg.RetryMaxAttempts, "retry-max", 0,
-		"Maximum number of join attempts. Defaults to 0, which will retry indefinitely.")
-	f.StringVar(&retryInterval, "retry-interval", "",
-		"Time to wait between join attempts.")
-	f.StringVar(&cmdCfg.DeprecatedRetryJoinEC2.Region, "retry-join-ec2-region", "",
-		"EC2 Region to discover servers in.")
-	f.StringVar(&cmdCfg.DeprecatedRetryJoinEC2.TagKey, "retry-join-ec2-tag-key", "",
-		"EC2 tag key to filter on for server discovery.")
-	f.StringVar(&cmdCfg.DeprecatedRetryJoinEC2.TagValue, "retry-join-ec2-tag-value", "",
-		"EC2 tag value to filter on for server discovery.")
-	f.StringVar(&cmdCfg.DeprecatedRetryJoinGCE.ProjectName, "retry-join-gce-project-name", "",
-		"Google Compute Engine project to discover servers in.")
-	f.StringVar(&cmdCfg.DeprecatedRetryJoinGCE.ZonePattern, "retry-join-gce-zone-pattern", "",
-		"Google Compute Engine region or zone to discover servers in (regex pattern).")
-	f.StringVar(&cmdCfg.DeprecatedRetryJoinGCE.TagValue, "retry-join-gce-tag-value", "",
-		"Google Compute Engine tag value to filter on for server discovery.")
-	f.StringVar(&cmdCfg.DeprecatedRetryJoinGCE.CredentialsFile, "retry-join-gce-credentials-file", "",
-		"Path to credentials JSON file to use with Google Compute Engine.")
-	f.StringVar(&cmdCfg.DeprecatedRetryJoinAzure.TagName, "retry-join-azure-tag-name", "",
-		"Azure tag name to filter on for server discovery.")
-	f.StringVar(&cmdCfg.DeprecatedRetryJoinAzure.TagValue, "retry-join-azure-tag-value", "",
-		"Azure tag value to filter on for server discovery.")
-	f.Var((*configutil.AppendSliceValue)(&cmdCfg.RetryJoinWan), "retry-join-wan",
-		"Address of an agent to join -wan at start time with retries enabled. "+
-			"Can be specified multiple times.")
-	f.IntVar(&cmdCfg.RetryMaxAttemptsWan, "retry-max-wan", 0,
-		"Maximum number of join -wan attempts. Defaults to 0, which will retry indefinitely.")
-	f.StringVar(&retryIntervalWan, "retry-interval-wan", "",
-		"Time to wait between join -wan attempts.")
+	// done: f.BoolVar(&cmdCfg.EnableSyslog, "syslog", false,
+	// done: 	"Enables logging to syslog.")
+	// done: f.BoolVar(&cmdCfg.RejoinAfterLeave, "rejoin", false,
+	// done: 	"Ignores a previous leave and attempts to rejoin the cluster.")
+	// done: f.Var((*configutil.AppendSliceValue)(&cmdCfg.StartJoin), "join",
+	// done: 	"Address of an agent to join at start time. Can be specified multiple times.")
+	// done: f.Var((*configutil.AppendSliceValue)(&cmdCfg.StartJoinWan), "join-wan",
+	// done: 	"Address of an agent to join -wan at start time. Can be specified multiple times.")
+	// done: f.Var((*configutil.AppendSliceValue)(&cmdCfg.RetryJoin), "retry-join",
+	// done: 	"Address of an agent to join at start time with retries enabled. Can be specified multiple times.")
+	// done: f.IntVar(&cmdCfg.RetryMaxAttempts, "retry-max", 0,
+	// done: 	"Maximum number of join attempts. Defaults to 0, which will retry indefinitely.")
+	// done: f.StringVar(&retryInterval, "retry-interval", "",
+	// done: 	"Time to wait between join attempts.")
+	// done: f.StringVar(&cmdCfg.DeprecatedRetryJoinEC2.Region, "retry-join-ec2-region", "",
+	// done: 	"EC2 Region to discover servers in.")
+	// done: f.StringVar(&cmdCfg.DeprecatedRetryJoinEC2.TagKey, "retry-join-ec2-tag-key", "",
+	// done: 	"EC2 tag key to filter on for server discovery.")
+	// done: f.StringVar(&cmdCfg.DeprecatedRetryJoinEC2.TagValue, "retry-join-ec2-tag-value", "",
+	// done: 	"EC2 tag value to filter on for server discovery.")
+	// done: f.StringVar(&cmdCfg.DeprecatedRetryJoinGCE.ProjectName, "retry-join-gce-project-name", "",
+	// done: 	"Google Compute Engine project to discover servers in.")
+	// done: f.StringVar(&cmdCfg.DeprecatedRetryJoinGCE.ZonePattern, "retry-join-gce-zone-pattern", "",
+	// done: 	"Google Compute Engine region or zone to discover servers in (regex pattern).")
+	// done: f.StringVar(&cmdCfg.DeprecatedRetryJoinGCE.TagValue, "retry-join-gce-tag-value", "",
+	// done: 	"Google Compute Engine tag value to filter on for server discovery.")
+	// done: f.StringVar(&cmdCfg.DeprecatedRetryJoinGCE.CredentialsFile, "retry-join-gce-credentials-file", "",
+	// done: 	"Path to credentials JSON file to use with Google Compute Engine.")
+	// done: f.StringVar(&cmdCfg.DeprecatedRetryJoinAzure.TagName, "retry-join-azure-tag-name", "",
+	// done: 	"Azure tag name to filter on for server discovery.")
+	// done: f.StringVar(&cmdCfg.DeprecatedRetryJoinAzure.TagValue, "retry-join-azure-tag-value", "",
+	// done: 	"Azure tag value to filter on for server discovery.")
+	// done: f.Var((*configutil.AppendSliceValue)(&cmdCfg.RetryJoinWan), "retry-join-wan",
+	// done: 	"Address of an agent to join -wan at start time with retries enabled. "+
+	// done: 		"Can be specified multiple times.")
+	// done: f.IntVar(&cmdCfg.RetryMaxAttemptsWan, "retry-max-wan", 0,
+	// done: 	"Maximum number of join -wan attempts. Defaults to 0, which will retry indefinitely.")
+	// done: f.StringVar(&retryIntervalWan, "retry-interval-wan", "",
+	// done: 	"Time to wait between join -wan attempts.")
 
-	// deprecated flags
-	var dcDeprecated string
-	var atlasJoin bool
-	var atlasInfrastructure, atlasToken, atlasEndpoint string
-	f.StringVar(&dcDeprecated, "dc", "",
-		"(deprecated) Datacenter of the agent (use 'datacenter' instead).")
-	f.StringVar(&atlasInfrastructure, "atlas", "",
-		"(deprecated) Sets the Atlas infrastructure name, enables SCADA.")
-	f.StringVar(&atlasToken, "atlas-token", "",
-		"(deprecated) Provides the Atlas API token.")
-	f.BoolVar(&atlasJoin, "atlas-join", false,
-		"(deprecated) Enables auto-joining the Atlas cluster.")
-	f.StringVar(&atlasEndpoint, "atlas-endpoint", "",
-		"(deprecated) The address of the endpoint for Atlas integration.")
+	// done: // deprecated flags
+	// done: var dcDeprecated string
+	// done: var atlasJoin bool
+	// done: var atlasInfrastructure, atlasToken, atlasEndpoint string
+	// done: f.StringVar(&dcDeprecated, "dc", "",
+	// done: 	"(deprecated) Datacenter of the agent (use 'datacenter' instead).")
+	// done: f.StringVar(&atlasInfrastructure, "atlas", "",
+	// done: 	"(deprecated) Sets the Atlas infrastructure name, enables SCADA.")
+	// done: f.StringVar(&atlasToken, "atlas-token", "",
+	// done: 	"(deprecated) Provides the Atlas API token.")
+	// done: f.BoolVar(&atlasJoin, "atlas-join", false,
+	// done: 	"(deprecated) Enables auto-joining the Atlas cluster.")
+	// done: f.StringVar(&atlasEndpoint, "atlas-endpoint", "",
+	// done: 	"(deprecated) The address of the endpoint for Atlas integration.")
 
-	if err := cmd.BaseCommand.Parse(cmd.args); err != nil {
-		return nil
-	}
+	// done: if err := cmd.BaseCommand.Parse(cmd.args); err != nil {
+	// done: 	return nil
+	// done: }
 
-	// check deprecated flags
-	if atlasInfrastructure != "" {
-		cmd.UI.Warn("WARNING: 'atlas' is deprecated")
-	}
-	if atlasToken != "" {
-		cmd.UI.Warn("WARNING: 'atlas-token' is deprecated")
-	}
-	if atlasJoin {
-		cmd.UI.Warn("WARNING: 'atlas-join' is deprecated")
-	}
-	if atlasEndpoint != "" {
-		cmd.UI.Warn("WARNING: 'atlas-endpoint' is deprecated")
-	}
-	if dcDeprecated != "" && cmdCfg.Datacenter == "" {
-		cmd.UI.Warn("WARNING: 'dc' is deprecated. Use 'datacenter' instead")
-		cmdCfg.Datacenter = dcDeprecated
-	}
+	// done: // check deprecated flags
+	// done: if atlasInfrastructure != "" {
+	// done: 	cmd.UI.Warn("WARNING: 'atlas' is deprecated")
+	// done: }
+	// done: if atlasToken != "" {
+	// done: 	cmd.UI.Warn("WARNING: 'atlas-token' is deprecated")
+	// done: }
+	// done: if atlasJoin {
+	// done: 	cmd.UI.Warn("WARNING: 'atlas-join' is deprecated")
+	// done: }
+	// done: if atlasEndpoint != "" {
+	// done: 	cmd.UI.Warn("WARNING: 'atlas-endpoint' is deprecated")
+	// done: }
+	// done: if dcDeprecated != "" && cmdCfg.Datacenter == "" {
+	// done: 	cmd.UI.Warn("WARNING: 'dc' is deprecated. Use 'datacenter' instead")
+	// done: 	cmdCfg.Datacenter = dcDeprecated
+	// done: }
 
-	if retryInterval != "" {
-		dur, err := time.ParseDuration(retryInterval)
-		if err != nil {
-			cmd.UI.Error(fmt.Sprintf("Error: %s", err))
-			return nil
-		}
-		cmdCfg.RetryInterval = dur
-	}
+	// done: if retryInterval != "" {
+	// done: 	dur, err := time.ParseDuration(retryInterval)
+	// done: 	if err != nil {
+	// done: 		cmd.UI.Error(fmt.Sprintf("Error: %s", err))
+	// done: 		return nil
+	// done: 	}
+	// done: 	cmdCfg.RetryInterval = dur
+	// done: }
 
-	if retryIntervalWan != "" {
-		dur, err := time.ParseDuration(retryIntervalWan)
-		if err != nil {
-			cmd.UI.Error(fmt.Sprintf("Error: %s", err))
-			return nil
-		}
-		cmdCfg.RetryIntervalWan = dur
-	}
+	// done: if retryIntervalWan != "" {
+	// done: 	dur, err := time.ParseDuration(retryIntervalWan)
+	// done: 	if err != nil {
+	// done: 		cmd.UI.Error(fmt.Sprintf("Error: %s", err))
+	// done: 		return nil
+	// done: 	}
+	// done: 	cmdCfg.RetryIntervalWan = dur
+	// done: }
 
 	if len(nodeMeta) > 0 {
 		cmdCfg.Meta = make(map[string]string)
@@ -246,7 +242,7 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 		cfg = agent.MergeConfig(cfg, fileConfig)
 	}
 
-	cmdCfg.DNSRecursors = append(cmdCfg.DNSRecursors, dnsRecursors...)
+	// done: cmdCfg.DNSRecursors = append(cmdCfg.DNSRecursors, dnsRecursors...)
 
 	cfg = agent.MergeConfig(cfg, &cmdCfg)
 	disableHostNodeID.Merge(cfg.DisableHostNodeID)
@@ -339,60 +335,60 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 		}
 	}
 
-	// Ensure the datacenter is always lowercased. The DNS endpoints automatically
-	// lowercase all queries, and internally we expect DC1 and dc1 to be the same.
-	cfg.Datacenter = strings.ToLower(cfg.Datacenter)
+	// done: // Ensure the datacenter is always lowercased. The DNS endpoints automatically
+	// done: // lowercase all queries, and internally we expect DC1 and dc1 to be the same.
+	// done: cfg.Datacenter = strings.ToLower(cfg.Datacenter)
 
-	// Verify datacenter is valid
-	if !validDatacenter.MatchString(cfg.Datacenter) {
-		cmd.UI.Error("Datacenter must be alpha-numeric with underscores and hypens only")
-		return nil
-	}
+	// done: // Verify datacenter is valid
+	// done: if !validDatacenter.MatchString(cfg.Datacenter) {
+	// done: 	cmd.UI.Error("Datacenter must be alpha-numeric with underscores and hypens only")
+	// done: 	return nil
+	// done: }
 
-	// If 'acl_datacenter' is set, ensure it is lowercased.
-	if cfg.ACLDatacenter != "" {
-		cfg.ACLDatacenter = strings.ToLower(cfg.ACLDatacenter)
+	// done: // If 'acl_datacenter' is set, ensure it is lowercased.
+	// done: if cfg.ACLDatacenter != "" {
+	// done: 	cfg.ACLDatacenter = strings.ToLower(cfg.ACLDatacenter)
 
-		// Verify 'acl_datacenter' is valid
-		if !validDatacenter.MatchString(cfg.ACLDatacenter) {
-			cmd.UI.Error("ACL datacenter must be alpha-numeric with underscores and hypens only")
-			return nil
-		}
-	}
+	// done: 	// Verify 'acl_datacenter' is valid
+	// done: 	if !validDatacenter.MatchString(cfg.ACLDatacenter) {
+	// done: 		cmd.UI.Error("ACL datacenter must be alpha-numeric with underscores and hypens only")
+	// done: 		return nil
+	// done: 	}
+	// done: }
 
-	// Only allow bootstrap mode when acting as a server
-	if cfg.Bootstrap && !cfg.Server {
-		cmd.UI.Error("Bootstrap mode cannot be enabled when server mode is not enabled")
-		return nil
-	}
+	// done: // Only allow bootstrap mode when acting as a server
+	// done: if cfg.Bootstrap && !cfg.Server {
+	// done: 	cmd.UI.Error("Bootstrap mode cannot be enabled when server mode is not enabled")
+	// done: 	return nil
+	// done: }
 
-	// Expect can only work when acting as a server
-	if cfg.BootstrapExpect != 0 && !cfg.Server {
-		cmd.UI.Error("Expect mode cannot be enabled when server mode is not enabled")
-		return nil
-	}
+	// done: // Expect can only work when acting as a server
+	// done: if cfg.BootstrapExpect != 0 && !cfg.Server {
+	// done: 	cmd.UI.Error("Expect mode cannot be enabled when server mode is not enabled")
+	// done: 	return nil
+	// done: }
 
-	// Expect can only work when dev mode is off
-	if cfg.BootstrapExpect > 0 && cfg.DevMode {
-		cmd.UI.Error("Expect mode cannot be enabled when dev mode is enabled")
-		return nil
-	}
+	// done: // Expect can only work when dev mode is off
+	// done: if cfg.BootstrapExpect > 0 && cfg.DevMode {
+	// done: 	cmd.UI.Error("Expect mode cannot be enabled when dev mode is enabled")
+	// done: 	return nil
+	// done: }
 
-	// Expect & Bootstrap are mutually exclusive
-	if cfg.BootstrapExpect != 0 && cfg.Bootstrap {
-		cmd.UI.Error("Bootstrap cannot be provided with an expected server count")
-		return nil
-	}
+	// done: // Expect & Bootstrap are mutually exclusive
+	// done: if cfg.BootstrapExpect != 0 && cfg.Bootstrap {
+	// done: 	cmd.UI.Error("Bootstrap cannot be provided with an expected server count")
+	// done: 	return nil
+	// done: }
 
-	if ipaddr.IsAny(cfg.AdvertiseAddr) {
-		cmd.UI.Error("Advertise address cannot be " + cfg.AdvertiseAddr)
-		return nil
-	}
+	// done: if ipaddr.IsAny(cfg.AdvertiseAddr) {
+	// done: 	cmd.UI.Error("Advertise address cannot be " + cfg.AdvertiseAddr)
+	// done: 	return nil
+	// done: }
 
-	if ipaddr.IsAny(cfg.AdvertiseAddrWan) {
-		cmd.UI.Error("Advertise WAN address cannot be " + cfg.AdvertiseAddrWan)
-		return nil
-	}
+	// done: if ipaddr.IsAny(cfg.AdvertiseAddrWan) {
+	// done: 	cmd.UI.Error("Advertise WAN address cannot be " + cfg.AdvertiseAddrWan)
+	// done: 	return nil
+	// done: }
 
 	if cfg.Server && cfg.Segment != "" {
 		cmd.UI.Error("Segment option can only be set on clients")
@@ -404,81 +400,81 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 		return nil
 	}
 
-	// patch deprecated retry-join-{gce,azure,ec2)-* parameters
-	// into -retry-join and issue warning.
-	// todo(fs): this should really be in DecodeConfig where it can be tested
-	if !reflect.DeepEqual(cfg.DeprecatedRetryJoinEC2, agent.RetryJoinEC2{}) {
-		m := discover.Config{
-			"provider":          "aws",
-			"region":            cfg.DeprecatedRetryJoinEC2.Region,
-			"tag_key":           cfg.DeprecatedRetryJoinEC2.TagKey,
-			"tag_value":         cfg.DeprecatedRetryJoinEC2.TagValue,
-			"access_key_id":     cfg.DeprecatedRetryJoinEC2.AccessKeyID,
-			"secret_access_key": cfg.DeprecatedRetryJoinEC2.SecretAccessKey,
-		}
-		cfg.RetryJoin = append(cfg.RetryJoin, m.String())
-		cfg.DeprecatedRetryJoinEC2 = agent.RetryJoinEC2{}
+	// done: // patch deprecated retry-join-{gce,azure,ec2)-* parameters
+	// done: // into -retry-join and issue warning.
+	// done: // todo(fs): this should really be in DecodeConfig where it can be tested
+	// done: if !reflect.DeepEqual(cfg.DeprecatedRetryJoinEC2, agent.RetryJoinEC2{}) {
+	// done: 	m := discover.Config{
+	// done: 		"provider":          "aws",
+	// done: 		"region":            cfg.DeprecatedRetryJoinEC2.Region,
+	// done: 		"tag_key":           cfg.DeprecatedRetryJoinEC2.TagKey,
+	// done: 		"tag_value":         cfg.DeprecatedRetryJoinEC2.TagValue,
+	// done: 		"access_key_id":     cfg.DeprecatedRetryJoinEC2.AccessKeyID,
+	// done: 		"secret_access_key": cfg.DeprecatedRetryJoinEC2.SecretAccessKey,
+	// done: 	}
+	// done: 	cfg.RetryJoin = append(cfg.RetryJoin, m.String())
+	// done: 	cfg.DeprecatedRetryJoinEC2 = agent.RetryJoinEC2{}
 
-		// redact m before output
-		if m["access_key_id"] != "" {
-			m["access_key_id"] = "hidden"
-		}
-		if m["secret_access_key"] != "" {
-			m["secret_access_key"] = "hidden"
-		}
+	// done: 	// redact m before output
+	// done: 	if m["access_key_id"] != "" {
+	// done: 		m["access_key_id"] = "hidden"
+	// done: 	}
+	// done: 	if m["secret_access_key"] != "" {
+	// done: 		m["secret_access_key"] = "hidden"
+	// done: 	}
 
-		cmd.UI.Warn(fmt.Sprintf("==> DEPRECATION: retry_join_ec2 is deprecated. "+
-			"Please add %q to retry_join\n", m))
-	}
-	if !reflect.DeepEqual(cfg.DeprecatedRetryJoinAzure, agent.RetryJoinAzure{}) {
-		m := discover.Config{
-			"provider":          "azure",
-			"tag_name":          cfg.DeprecatedRetryJoinAzure.TagName,
-			"tag_value":         cfg.DeprecatedRetryJoinAzure.TagValue,
-			"subscription_id":   cfg.DeprecatedRetryJoinAzure.SubscriptionID,
-			"tenant_id":         cfg.DeprecatedRetryJoinAzure.TenantID,
-			"client_id":         cfg.DeprecatedRetryJoinAzure.ClientID,
-			"secret_access_key": cfg.DeprecatedRetryJoinAzure.SecretAccessKey,
-		}
-		cfg.RetryJoin = append(cfg.RetryJoin, m.String())
-		cfg.DeprecatedRetryJoinAzure = agent.RetryJoinAzure{}
+	// done: 	cmd.UI.Warn(fmt.Sprintf("==> DEPRECATION: retry_join_ec2 is deprecated. "+
+	// done: 		"Please add %q to retry_join\n", m))
+	// done: }
+	// done: if !reflect.DeepEqual(cfg.DeprecatedRetryJoinAzure, agent.RetryJoinAzure{}) {
+	// done: 	m := discover.Config{
+	// done: 		"provider":          "azure",
+	// done: 		"tag_name":          cfg.DeprecatedRetryJoinAzure.TagName,
+	// done: 		"tag_value":         cfg.DeprecatedRetryJoinAzure.TagValue,
+	// done: 		"subscription_id":   cfg.DeprecatedRetryJoinAzure.SubscriptionID,
+	// done: 		"tenant_id":         cfg.DeprecatedRetryJoinAzure.TenantID,
+	// done: 		"client_id":         cfg.DeprecatedRetryJoinAzure.ClientID,
+	// done: 		"secret_access_key": cfg.DeprecatedRetryJoinAzure.SecretAccessKey,
+	// done: 	}
+	// done: 	cfg.RetryJoin = append(cfg.RetryJoin, m.String())
+	// done: 	cfg.DeprecatedRetryJoinAzure = agent.RetryJoinAzure{}
 
-		// redact m before output
-		if m["subscription_id"] != "" {
-			m["subscription_id"] = "hidden"
-		}
-		if m["tenant_id"] != "" {
-			m["tenant_id"] = "hidden"
-		}
-		if m["client_id"] != "" {
-			m["client_id"] = "hidden"
-		}
-		if m["secret_access_key"] != "" {
-			m["secret_access_key"] = "hidden"
-		}
+	// done: 	// redact m before output
+	// done: 	if m["subscription_id"] != "" {
+	// done: 		m["subscription_id"] = "hidden"
+	// done: 	}
+	// done: 	if m["tenant_id"] != "" {
+	// done: 		m["tenant_id"] = "hidden"
+	// done: 	}
+	// done: 	if m["client_id"] != "" {
+	// done: 		m["client_id"] = "hidden"
+	// done: 	}
+	// done: 	if m["secret_access_key"] != "" {
+	// done: 		m["secret_access_key"] = "hidden"
+	// done: 	}
 
-		cmd.UI.Warn(fmt.Sprintf("==> DEPRECATION: retry_join_azure is deprecated. "+
-			"Please add %q to retry_join\n", m))
-	}
-	if !reflect.DeepEqual(cfg.DeprecatedRetryJoinGCE, agent.RetryJoinGCE{}) {
-		m := discover.Config{
-			"provider":         "gce",
-			"project_name":     cfg.DeprecatedRetryJoinGCE.ProjectName,
-			"zone_pattern":     cfg.DeprecatedRetryJoinGCE.ZonePattern,
-			"tag_value":        cfg.DeprecatedRetryJoinGCE.TagValue,
-			"credentials_file": cfg.DeprecatedRetryJoinGCE.CredentialsFile,
-		}
-		cfg.RetryJoin = append(cfg.RetryJoin, m.String())
-		cfg.DeprecatedRetryJoinGCE = agent.RetryJoinGCE{}
+	// done: 	cmd.UI.Warn(fmt.Sprintf("==> DEPRECATION: retry_join_azure is deprecated. "+
+	// done: 		"Please add %q to retry_join\n", m))
+	// done: }
+	// done: if !reflect.DeepEqual(cfg.DeprecatedRetryJoinGCE, agent.RetryJoinGCE{}) {
+	// done: 	m := discover.Config{
+	// done: 		"provider":         "gce",
+	// done: 		"project_name":     cfg.DeprecatedRetryJoinGCE.ProjectName,
+	// done: 		"zone_pattern":     cfg.DeprecatedRetryJoinGCE.ZonePattern,
+	// done: 		"tag_value":        cfg.DeprecatedRetryJoinGCE.TagValue,
+	// done: 		"credentials_file": cfg.DeprecatedRetryJoinGCE.CredentialsFile,
+	// done: 	}
+	// done: 	cfg.RetryJoin = append(cfg.RetryJoin, m.String())
+	// done: 	cfg.DeprecatedRetryJoinGCE = agent.RetryJoinGCE{}
 
-		// redact m before output
-		if m["credentials_file"] != "" {
-			m["credentials_file"] = "hidden"
-		}
+	// done: 	// redact m before output
+	// done: 	if m["credentials_file"] != "" {
+	// done: 		m["credentials_file"] = "hidden"
+	// done: 	}
 
-		cmd.UI.Warn(fmt.Sprintf("==> DEPRECATION: retry_join_gce is deprecated. "+
-			"Please add %q to retry_join\n", m))
-	}
+	// done: 	cmd.UI.Warn(fmt.Sprintf("==> DEPRECATION: retry_join_gce is deprecated. "+
+	// done: 		"Please add %q to retry_join\n", m))
+	// done: }
 
 	// Compile all the watches
 	for _, params := range cfg.Watches {
@@ -500,36 +496,36 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 		cfg.WatchPlans = append(cfg.WatchPlans, wp)
 	}
 
-	// Warn if we are in expect mode
-	if cfg.BootstrapExpect == 1 {
-		cmd.UI.Error("WARNING: BootstrapExpect Mode is specified as 1; this is the same as Bootstrap mode.")
-		cfg.BootstrapExpect = 0
-		cfg.Bootstrap = true
-	} else if cfg.BootstrapExpect > 0 {
-		cmd.UI.Error(fmt.Sprintf("WARNING: Expect Mode enabled, expecting %d servers", cfg.BootstrapExpect))
-	}
+	// done: // Warn if we are in expect mode
+	// done: if cfg.BootstrapExpect == 1 {
+	// done: 	cmd.UI.Error("WARNING: BootstrapExpect Mode is specified as 1; this is the same as Bootstrap mode.")
+	// done: 	cfg.BootstrapExpect = 0
+	// done: 	cfg.Bootstrap = true
+	// done: } else if cfg.BootstrapExpect > 0 {
+	// done: 	cmd.UI.Error(fmt.Sprintf("WARNING: Expect Mode enabled, expecting %d servers", cfg.BootstrapExpect))
+	// done: }
 
-	// Warn if we are expecting an even number of servers
-	if cfg.BootstrapExpect != 0 && cfg.BootstrapExpect%2 == 0 {
-		if cfg.BootstrapExpect == 2 {
-			cmd.UI.Error("WARNING: A cluster with 2 servers will provide no failure tolerance.  See https://www.consul.io/docs/internals/consensus.html#deployment-table")
-		} else {
-			cmd.UI.Error("WARNING: A cluster with an even number of servers does not achieve optimum fault tolerance.  See https://www.consul.io/docs/internals/consensus.html#deployment-table")
-		}
-	}
+	// done: // Warn if we are expecting an even number of servers
+	// done: if cfg.BootstrapExpect != 0 && cfg.BootstrapExpect%2 == 0 {
+	// done: 	if cfg.BootstrapExpect == 2 {
+	// done: 		cmd.UI.Error("WARNING: A cluster with 2 servers will provide no failure tolerance.  See https://www.consul.io/docs/internals/consensus.html#deployment-table")
+	// done: 	} else {
+	// done: 		cmd.UI.Error("WARNING: A cluster with an even number of servers does not achieve optimum fault tolerance.  See https://www.consul.io/docs/internals/consensus.html#deployment-table")
+	// done: 	}
+	// done: }
 
-	// Warn if we are in bootstrap mode
-	if cfg.Bootstrap {
-		cmd.UI.Error("WARNING: Bootstrap mode enabled! Do not enable unless necessary")
-	}
+	// done: // Warn if we are in bootstrap mode
+	// done: if cfg.Bootstrap {
+	// done: 	cmd.UI.Error("WARNING: Bootstrap mode enabled! Do not enable unless necessary")
+	// done: }
 
-	// It doesn't make sense to include both UI options.
-	if cfg.EnableUI == true && cfg.UIDir != "" {
-		cmd.UI.Error("Both the ui and ui-dir flags were specified, please provide only one")
-		cmd.UI.Error("If trying to use your own web UI resources, use the ui-dir flag")
-		cmd.UI.Error("If using Consul version 0.7.0 or later, the web UI is included in the binary so use ui to enable it")
-		return nil
-	}
+	// done: // It doesn't make sense to include both UI options.
+	// done: if cfg.EnableUI == true && cfg.UIDir != "" {
+	// done: 	cmd.UI.Error("Both the ui and ui-dir flags were specified, please provide only one")
+	// done: 	cmd.UI.Error("If trying to use your own web UI resources, use the ui-dir flag")
+	// done: 	cmd.UI.Error("If using Consul version 0.7.0 or later, the web UI is included in the binary so use ui to enable it")
+	// done: 	return nil
+	// done: }
 
 	// Set the version info
 	cfg.Revision = cmd.Revision

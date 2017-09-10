@@ -28,7 +28,10 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		warns            []string
 		err              error
 	}{
+		// ------------------------------------------------------------
 		// cmd line flags
+		//
+
 		{
 			desc:  "-advertise",
 			flags: []string{`-advertise`, `a`},
@@ -238,7 +241,10 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			rt:    RuntimeConfig{UIDir: "a"},
 		},
 
+		// ------------------------------------------------------------
 		// deprecated flags
+		//
+
 		{
 			desc:  "-atlas",
 			flags: []string{`-atlas`, `a`},
@@ -324,7 +330,10 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce zone_pattern=a" to retry_join.`},
 		},
 
+		// ------------------------------------------------------------
 		// deprecated fields
+		//
+
 		{
 			desc:  "check.service_id alias",
 			json:  []string{`{"check":{ "service_id":"d", "serviceid":"dd" }}`},
@@ -472,7 +481,10 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			warns: []string{`config: "statsite_prefix" is deprecated. Please use "telemetry.statsite_prefix" instead.`},
 		},
 
+		// ------------------------------------------------------------
 		// ports and addresses
+		//
+
 		{
 			desc: "client addr and ports == 0",
 			json: []string{`{
@@ -677,7 +689,10 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			rt:   RuntimeConfig{SerfBindAddrWAN: "1.2.3.4"},
 		},
 
+		// ------------------------------------------------------------
 		// precedence rules
+		//
+
 		{
 			desc: "precedence: merge order",
 			json: []string{
@@ -775,6 +790,23 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				StartJoinAddrsLAN: []string{"c", "d", "a", "b"},
 			},
 		},
+
+		// ------------------------------------------------------------
+		// validations
+		//
+
+		{
+			desc: "datacenter is lower-cased",
+			json: []string{`{ "datacenter": "A" }`},
+			hcl:  []string{`datacenter = "A"`},
+			rt:   RuntimeConfig{Datacenter: "a"},
+		},
+		{
+			desc: "acl_datacenter is lower-cased",
+			json: []string{`{ "acl_datacenter": "A" }`},
+			hcl:  []string{`acl_datacenter = "A"`},
+			rt:   RuntimeConfig{ACLDatacenter: "a"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -852,7 +884,7 @@ func TestFullConfig(t *testing.T) {
 		"json": `{
 			"acl_agent_master_token": "furuQD0b",
 			"acl_agent_token": "cOshLOQ2",
-			"acl_datacenter": "M3uRCk3Z",
+			"acl_datacenter": "m3urck3z",
 			"acl_default_policy": "ArK3WIfE",
 			"acl_down_policy": "vZXMfMP0",
 			"acl_enforce_version_8": true,
@@ -960,7 +992,7 @@ func TestFullConfig(t *testing.T) {
 			"check_update_interval": "16507s",
 			"client_addr": "e15dFavQ",
 			"data_dir": "oTOOIoV9",
-			"datacenter": "rzo029wG",
+			"datacenter": "rzo029wg",
 			"disable_anonymous_signature": true,
 			"disable_coordinates": true,
 			"disable_host_node_id": true,
@@ -1242,7 +1274,7 @@ func TestFullConfig(t *testing.T) {
 		"hcl": `
 			acl_agent_master_token = "furuQD0b"
 			acl_agent_token = "cOshLOQ2"
-			acl_datacenter = "M3uRCk3Z"
+			acl_datacenter = "m3urck3z"
 			acl_default_policy = "ArK3WIfE"
 			acl_down_policy = "vZXMfMP0"
 			acl_enforce_version_8 = true
@@ -1350,7 +1382,7 @@ func TestFullConfig(t *testing.T) {
 			check_update_interval = "16507s"
 			client_addr = "e15dFavQ"
 			data_dir = "oTOOIoV9"
-			datacenter = "rzo029wG"
+			datacenter = "rzo029wg"
 			disable_anonymous_signature = true
 			disable_coordinates = true
 			disable_host_node_id = true
@@ -1633,7 +1665,7 @@ func TestFullConfig(t *testing.T) {
 	want := RuntimeConfig{
 		ACLAgentMasterToken:              "furuQD0b",
 		ACLAgentToken:                    "cOshLOQ2",
-		ACLDatacenter:                    "M3uRCk3Z",
+		ACLDatacenter:                    "m3urck3z",
 		ACLDefaultPolicy:                 "ArK3WIfE",
 		ACLDownPolicy:                    "vZXMfMP0",
 		ACLEnforceVersion8:               true,
@@ -1743,7 +1775,7 @@ func TestFullConfig(t *testing.T) {
 		DNSServiceTTL:             map[string]time.Duration{"*": 32030 * time.Second},
 		DNSUDPAnswerLimit:         29909,
 		DataDir:                   "oTOOIoV9",
-		Datacenter:                "rzo029wG",
+		Datacenter:                "rzo029wg",
 		DevMode:                   true,
 		DisableAnonymousSignature: true,
 		DisableCoordinates:        true,
