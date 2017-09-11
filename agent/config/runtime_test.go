@@ -744,143 +744,145 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					NodeName:                "nodex",
 				},
 			},
+		*/
 
-			// ------------------------------------------------------------
-			// ports and addresses
-			//
+		// ------------------------------------------------------------
+		// ports and addresses
+		//
 
-			{
-				desc: "client addr and ports == 0",
-				json: []string{`{
+		{
+			desc: "client addr and ports == 0",
+			json: []string{`{
 					"client_addr":"0.0.0.0",
 					"ports":{}
 				}`},
-				hcl: []string{`
+			hcl: []string{`
 					client_addr = "0.0.0.0"
 					ports {}
 				`},
-				rt: RuntimeConfig{
-					ClientAddrs: []string{"0.0.0.0"},
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			patch: func(rt *RuntimeConfig) {
+				rt.ClientAddrs = []string{"0.0.0.0"}
+				rt.DNSAddrs = []string{":8600"}
+				rt.HTTPAddrs = []string{":8500"}
 			},
-			{
-				desc: "client addr and ports < 0",
-				json: []string{`{
+		},
+		{
+			desc: "client addr and ports < 0",
+			json: []string{`{
 					"client_addr":"0.0.0.0",
 					"ports": { "dns":-1, "http":-2, "https":-3 }
 				}`},
-				hcl: []string{`
+			hcl: []string{`
 					client_addr = "0.0.0.0"
 					ports { dns = -1 http = -2 https = -3 }
 				`},
-				rt: RuntimeConfig{
-					ClientAddrs: []string{"0.0.0.0"},
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			patch: func(rt *RuntimeConfig) {
+				rt.ClientAddrs = []string{"0.0.0.0"}
+				rt.DNSPort = 0
+				rt.DNSAddrs = []string{}
+				rt.HTTPPort = 0
+				rt.HTTPAddrs = []string{}
 			},
-			{
-				desc: "client addr and ports < 0",
-				json: []string{`{
+		},
+		{
+			desc: "client addr and ports < 0",
+			json: []string{`{
 					"client_addr":"0.0.0.0",
 					"ports": { "dns":-1, "http":-2, "https":-3 }
 				}`},
-				hcl: []string{`
+			hcl: []string{`
 					client_addr = "0.0.0.0"
 					ports { dns = -1 http = -2 https = -3 }
 				`},
-				rt: RuntimeConfig{
-					ClientAddrs: []string{"0.0.0.0"},
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			patch: func(rt *RuntimeConfig) {
+				rt.ClientAddrs = []string{"0.0.0.0"}
+				rt.DNSPort = 0
+				rt.DNSAddrs = []string{}
+				rt.HTTPPort = 0
+				rt.HTTPAddrs = []string{}
 			},
-			{
-				desc: "client addr and ports > 0",
-				json: []string{`{
+		},
+		{
+			desc: "client addr and ports > 0",
+			json: []string{`{
 					"client_addr":"0.0.0.0",
 					"ports":{ "dns": 1, "http": 2, "https": 3 }
 				}`},
-				hcl: []string{`
+			hcl: []string{`
 					client_addr = "0.0.0.0"
 					ports { dns = 1 http = 2 https = 3 }
 				`},
-				rt: RuntimeConfig{
-					ClientAddrs: []string{"0.0.0.0"},
-					DNSPort:     1,
-					HTTPPort:    2,
-					HTTPSPort:   3,
-					DNSAddrs:    []string{":1"},
-					HTTPAddrs:   []string{":2"},
-					HTTPSAddrs:  []string{":3"},
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			patch: func(rt *RuntimeConfig) {
+				rt.ClientAddrs = []string{"0.0.0.0"}
+				rt.DNSPort = 1
+				rt.DNSAddrs = []string{":1"}
+				rt.HTTPPort = 2
+				rt.HTTPAddrs = []string{":2"}
+				rt.HTTPSPort = 3
+				rt.HTTPSAddrs = []string{":3"}
 			},
+		},
 
-			{
-				desc: "client addr, addresses and ports == 0",
-				json: []string{`{
+		{
+			desc: "client addr, addresses and ports == 0",
+			json: []string{`{
 					"client_addr":"0.0.0.0",
 					"addresses": { "dns": "1.1.1.1", "http": "2.2.2.2", "https": "3.3.3.3" },
 					"ports":{}
 				}`},
-				hcl: []string{`
+			hcl: []string{`
 					client_addr = "0.0.0.0"
 					addresses = { dns = "1.1.1.1" http = "2.2.2.2" https = "3.3.3.3" }
 					ports {}
 				`},
-				rt: RuntimeConfig{
-					ClientAddrs: []string{"0.0.0.0"},
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			patch: func(rt *RuntimeConfig) {
+				rt.ClientAddrs = []string{"0.0.0.0"}
+				rt.DNSAddrs = []string{"1.1.1.1:8600"}
+				rt.HTTPAddrs = []string{"2.2.2.2:8500"}
 			},
-			{
-				desc: "client addr, addresses and ports < 0",
-				json: []string{`{
+		},
+		{
+			desc: "client addr, addresses and ports < 0",
+			json: []string{`{
 					"client_addr":"0.0.0.0",
 					"addresses": { "dns": "1.1.1.1", "http": "2.2.2.2", "https": "3.3.3.3" },
 					"ports": { "dns":-1, "http":-2, "https":-3 }
 				}`},
-				hcl: []string{`
+			hcl: []string{`
 					client_addr = "0.0.0.0"
 					addresses = { dns = "1.1.1.1" http = "2.2.2.2" https = "3.3.3.3" }
 					ports { dns = -1 http = -2 https = -3 }
 				`},
-				rt: RuntimeConfig{
-					ClientAddrs: []string{"0.0.0.0"},
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			patch: func(rt *RuntimeConfig) {
+				rt.ClientAddrs = []string{"0.0.0.0"}
+				rt.DNSPort = 0
+				rt.DNSAddrs = []string{}
+				rt.HTTPPort = 0
+				rt.HTTPAddrs = []string{}
 			},
-			{
-				desc: "client addr, addresses and ports",
-				json: []string{`{
+		},
+		{
+			desc: "client addr, addresses and ports",
+			json: []string{`{
 					"client_addr": "0.0.0.0",
 					"addresses": { "dns": "1.1.1.1", "http": "2.2.2.2", "https": "3.3.3.3" },
 					"ports":{ "dns":1, "http":2, "https":3 }
 				}`},
-				hcl: []string{`
+			hcl: []string{`
 					client_addr = "0.0.0.0"
 					addresses = { dns = "1.1.1.1" http = "2.2.2.2" https = "3.3.3.3" }
 					ports { dns = 1 http = 2 https = 3 }
 				`},
-				rt: RuntimeConfig{
-					ClientAddrs: []string{"0.0.0.0"},
-					DNSPort:     1,
-					HTTPPort:    2,
-					HTTPSPort:   3,
-					DNSAddrs:    []string{"1.1.1.1:1"},
-					HTTPAddrs:   []string{"2.2.2.2:2"},
-					HTTPSAddrs:  []string{"3.3.3.3:3"},
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			patch: func(rt *RuntimeConfig) {
+				rt.ClientAddrs = []string{"0.0.0.0"}
+				rt.DNSPort = 1
+				rt.DNSAddrs = []string{"1.1.1.1:1"}
+				rt.HTTPPort = 2
+				rt.HTTPAddrs = []string{"2.2.2.2:2"}
+				rt.HTTPSPort = 3
+				rt.HTTPSAddrs = []string{"3.3.3.3:3"}
 			},
-		*/
+		},
 		{
 			desc: "client template and ports",
 			json: []string{`{
