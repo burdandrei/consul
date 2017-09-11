@@ -332,6 +332,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	}
 	httpsAddrs := addrs("https", clientAddrs, c.Addresses.HTTPS, httpsPort)
 
+	// todo(fs): add ports
 	advertiseAddrLAN := b.singleIPTemplateVal("advertise lan", c.AdvertiseAddrLAN)
 	advertiseAddrWAN := b.singleIPTemplateVal("advertise wan", c.AdvertiseAddrWAN)
 	serfAdvertiseAddrLAN := b.singleIPTemplateVal("serf advertise lan", c.AdvertiseAddrs.SerfLAN)
@@ -699,6 +700,28 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 
 	if err := structs.ValidateMetadata(rt.NodeMeta, false); err != nil {
 		return fmt.Errorf("Failed to parse node metadata: %v", err)
+	}
+
+	// make sure listener addresses are unique
+	usage := map[string]string{}
+	uniqueUsage := func(name string, addrs []string) error {
+		for _, a := range addrs {
+			if other, inuse := usage[a]; inuse {
+				return fmt.Errorf("%s address %s already configured for %s", name, a, other)
+			}
+			usage[a] = name
+		}
+		return nil
+	}
+
+	if err := uniqueUsage("DNS", rt.DNSAddrs); err != nil {
+		return err
+	}
+	if err := uniqueUsage("HTTP", rt.HTTPAddrs); err != nil {
+		return err
+	}
+	if err := uniqueUsage("HTTPS", rt.HTTPSAddrs); err != nil {
+		return err
 	}
 
 	return nil

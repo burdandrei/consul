@@ -1313,6 +1313,51 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			},
 			verr: errors.New("Failed to parse node metadata: Node metadata cannot contain more than 64 key/value pairs"),
 		},
+		{
+			desc:  "unique listeners dns vs http",
+			flags: []string{`-datacenter=a`},
+			json: []string{`{
+				"client_addr": "1.2.3.4",
+				"ports": { "dns": 1000, "http": 1000 },
+				"dns_config": { "udp_answer_limit": 1 }
+			}`},
+			hcl: []string{`
+				client_addr = "1.2.3.4"
+				ports = { dns = 1000 http = 1000 }
+				dns_config = { udp_answer_limit = 1 }
+			`},
+			verr: errors.New("HTTP address 1.2.3.4:1000 already configured for DNS"),
+		},
+		{
+			desc:  "unique listeners dns vs https",
+			flags: []string{`-datacenter=a`},
+			json: []string{`{
+				"client_addr": "1.2.3.4",
+				"ports": { "dns": 1000, "https": 1000 },
+				"dns_config": { "udp_answer_limit": 1 }
+			}`},
+			hcl: []string{`
+				client_addr = "1.2.3.4"
+				ports = { dns = 1000 https = 1000 }
+				dns_config = { udp_answer_limit = 1 }
+			`},
+			verr: errors.New("HTTPS address 1.2.3.4:1000 already configured for DNS"),
+		},
+		{
+			desc:  "unique listeners http vs https",
+			flags: []string{`-datacenter=a`},
+			json: []string{`{
+				"client_addr": "1.2.3.4",
+				"ports": { "http": 1000, "https": 1000 },
+				"dns_config": { "udp_answer_limit": 1 }
+			}`},
+			hcl: []string{`
+				client_addr = "1.2.3.4"
+				ports = { http = 1000 https = 1000 }
+				dns_config = { udp_answer_limit = 1 }
+			`},
+			verr: errors.New("HTTPS address 1.2.3.4:1000 already configured for HTTP"),
+		},
 	}
 
 	for _, tt := range tests {
