@@ -52,15 +52,14 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 	}
 
 	tests := []struct {
-		desc  string
-		flags []string
-		json  []string
-		hcl   []string
-		//rt       RuntimeConfig
+		desc     string
+		flags    []string
+		json     []string
+		hcl      []string
 		patch    func(rt *RuntimeConfig)
-		err      error                  // build error
-		warns    []string               // build and validation warnings
-		hostname func() (string, error) // mock hostname function
+		err      error
+		warns    []string
+		hostname func() (string, error)
 	}{
 		// ------------------------------------------------------------
 		// cmd line flags
@@ -93,8 +92,8 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.Bootstrap = true
 				rt.ServerMode = true
-				rt.LeaveOnTerm = !rt.ServerMode
-				rt.SkipLeaveOnInt = rt.ServerMode
+				rt.LeaveOnTerm = false
+				rt.SkipLeaveOnInt = true
 			},
 			warns: []string{"Bootstrap mode enabled! Do not enable unless necessary"},
 		},
@@ -104,8 +103,8 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.BootstrapExpect = 3
 				rt.ServerMode = true
-				rt.LeaveOnTerm = !rt.ServerMode
-				rt.SkipLeaveOnInt = rt.ServerMode
+				rt.LeaveOnTerm = false
+				rt.SkipLeaveOnInt = true
 			},
 			warns: []string{"BootstrapExpect mode enabled, expecting 3 servers"},
 		},
@@ -190,426 +189,334 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				rt.HTTPAddrs = []string{"127.0.0.1:123"}
 			},
 		},
-		/*
-			{
-				desc:  "-join",
-				flags: []string{`-join`, `a`, `-join`, `b`},
-				rt: RuntimeConfig{
-					StartJoinAddrsLAN: []string{"a", "b"},
-					LeaveOnTerm:       true,
-					NodeName:          "nodex",
-				},
+		{
+			desc:  "-join",
+			flags: []string{`-join`, `a`, `-join`, `b`},
+			patch: func(rt *RuntimeConfig) {
+				rt.StartJoinAddrsLAN = []string{"a", "b"}
 			},
-			{
-				desc:  "-join-wan",
-				flags: []string{`-join-wan`, `a`, `-join-wan`, `b`},
-				rt: RuntimeConfig{
-					StartJoinAddrsWAN: []string{"a", "b"},
-					LeaveOnTerm:       true,
-					NodeName:          "nodex",
-				},
+		},
+		{
+			desc:  "-join-wan",
+			flags: []string{`-join-wan`, `a`, `-join-wan`, `b`},
+			patch: func(rt *RuntimeConfig) {
+				rt.StartJoinAddrsWAN = []string{"a", "b"}
 			},
-			{
-				desc:  "-log-level",
-				flags: []string{`-log-level`, `a`},
-				rt: RuntimeConfig{
-					LogLevel:    "a",
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+		},
+		{
+			desc:  "-log-level",
+			flags: []string{`-log-level`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.LogLevel = "a"
 			},
-			{ // todo(fs): shouldn't this be '-node-name'?
-				desc:  "-node",
-				flags: []string{`-node`, `a`},
-				rt: RuntimeConfig{
-					NodeName:    "a",
-					LeaveOnTerm: true,
-				},
+		},
+		{ // todo(fs): shouldn't this be '-node-name'?
+			desc:  "-node",
+			flags: []string{`-node`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.NodeName = "a"
 			},
-			{
-				desc:  "-node-id",
-				flags: []string{`-node-id`, `a`},
-				rt: RuntimeConfig{
-					NodeID:      "a",
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+		},
+		{
+			desc:  "-node-id",
+			flags: []string{`-node-id`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.NodeID = "a"
 			},
-			{
-				desc:  "-node-meta",
-				flags: []string{`-node-meta`, `a:b`, `-node-meta`, `c:d`},
-				rt: RuntimeConfig{
-					NodeMeta:    map[string]string{"a": "b", "c": "d"},
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+		},
+		{
+			desc:  "-node-meta",
+			flags: []string{`-node-meta`, `a:b`, `-node-meta`, `c:d`},
+			patch: func(rt *RuntimeConfig) {
+				rt.NodeMeta = map[string]string{"a": "b", "c": "d"}
 			},
-			{
-				desc:  "-non-voting-server",
-				flags: []string{`-non-voting-server`},
-				rt: RuntimeConfig{
-					NonVotingServer: true,
-					LeaveOnTerm:     true,
-					NodeName:        "nodex",
-				},
+		},
+		{
+			desc:  "-non-voting-server",
+			flags: []string{`-non-voting-server`},
+			patch: func(rt *RuntimeConfig) {
+				rt.NonVotingServer = true
 			},
-			{
-				desc:  "-pid-file",
-				flags: []string{`-pid-file`, `a`},
-				rt: RuntimeConfig{
-					PidFile:     "a",
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+		},
+		{
+			desc:  "-pid-file",
+			flags: []string{`-pid-file`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.PidFile = "a"
 			},
-			{
-				desc:  "-protocol",
-				flags: []string{`-protocol`, `1`},
-				rt: RuntimeConfig{
-					RPCProtocol: 1,
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+		},
+		{
+			desc:  "-protocol",
+			flags: []string{`-protocol`, `1`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RPCProtocol = 1
 			},
-			{
-				desc:  "-raft-protocol",
-				flags: []string{`-raft-protocol`, `1`},
-				rt: RuntimeConfig{
-					RaftProtocol: 1,
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+		},
+		{
+			desc:  "-raft-protocol",
+			flags: []string{`-raft-protocol`, `1`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RaftProtocol = 1
 			},
-			{
-				desc:  "-recursor",
-				flags: []string{`-recursor`, `a`, `-recursor`, `b`},
-				rt: RuntimeConfig{
-					DNSRecursors: []string{"a", "b"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+		},
+		{
+			desc:  "-recursor",
+			flags: []string{`-recursor`, `a`, `-recursor`, `b`},
+			patch: func(rt *RuntimeConfig) {
+				rt.DNSRecursors = []string{"a", "b"}
 			},
-			{
-				desc:  "-rejoin",
-				flags: []string{`-rejoin`},
-				rt: RuntimeConfig{
-					RejoinAfterLeave: true,
-					LeaveOnTerm:      true,
-					NodeName:         "nodex",
-				},
+		},
+		{
+			desc:  "-rejoin",
+			flags: []string{`-rejoin`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RejoinAfterLeave = true
 			},
-			{
-				desc:  "-retry-interval",
-				flags: []string{`-retry-interval`, `5s`},
-				rt: RuntimeConfig{
-					RetryJoinIntervalLAN: 5 * time.Second,
-					LeaveOnTerm:          true,
-					NodeName:             "nodex",
-				},
+		},
+		{
+			desc:  "-retry-interval",
+			flags: []string{`-retry-interval`, `5s`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinIntervalLAN = 5 * time.Second
 			},
-			{
-				desc:  "-retry-interval-wan",
-				flags: []string{`-retry-interval-wan`, `5s`},
-				rt: RuntimeConfig{
-					RetryJoinIntervalWAN: 5 * time.Second,
-					LeaveOnTerm:          true,
-					NodeName:             "nodex",
-				},
+		},
+		{
+			desc:  "-retry-interval-wan",
+			flags: []string{`-retry-interval-wan`, `5s`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinIntervalWAN = 5 * time.Second
 			},
-			{
-				desc:  "-retry-join",
-				flags: []string{`-retry-join`, `a`, `-retry-join`, `b`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"a", "b"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+		},
+		{
+			desc:  "-retry-join",
+			flags: []string{`-retry-join`, `a`, `-retry-join`, `b`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"a", "b"}
 			},
-			{
-				desc:  "-retry-join-wan",
-				flags: []string{`-retry-join-wan`, `a`, `-retry-join-wan`, `b`},
-				rt: RuntimeConfig{
-					RetryJoinWAN: []string{"a", "b"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+		},
+		{
+			desc:  "-retry-join-wan",
+			flags: []string{`-retry-join-wan`, `a`, `-retry-join-wan`, `b`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinWAN = []string{"a", "b"}
 			},
-			{
-				desc:  "-retry-max",
-				flags: []string{`-retry-max`, `1`},
-				rt: RuntimeConfig{
-					RetryJoinMaxAttemptsLAN: 1,
-					LeaveOnTerm:             true,
-					NodeName:                "nodex",
-				},
+		},
+		{
+			desc:  "-retry-max",
+			flags: []string{`-retry-max`, `1`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinMaxAttemptsLAN = 1
 			},
-			{
-				desc:  "-retry-max-wan",
-				flags: []string{`-retry-max-wan`, `1`},
-				rt: RuntimeConfig{
-					RetryJoinMaxAttemptsWAN: 1,
-					LeaveOnTerm:             true,
-					NodeName:                "nodex",
-				},
+		},
+		{
+			desc:  "-retry-max-wan",
+			flags: []string{`-retry-max-wan`, `1`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinMaxAttemptsWAN = 1
 			},
-			{
-				desc:  "-serf-lan-bind",
-				flags: []string{`-serf-lan-bind`, `a`},
-				rt: RuntimeConfig{
-					SerfBindAddrLAN: "a",
-					LeaveOnTerm:     true,
-					NodeName:        "nodex",
-				},
+		},
+		{
+			desc:  "-serf-lan-bind",
+			flags: []string{`-serf-lan-bind`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.SerfBindAddrLAN = "a"
 			},
-			{
-				desc:  "-serf-wan-bind",
-				flags: []string{`-serf-wan-bind`, `a`},
-				rt: RuntimeConfig{
-					SerfBindAddrWAN: "a",
-					LeaveOnTerm:     true,
-					NodeName:        "nodex",
-				},
+		},
+		{
+			desc:  "-serf-wan-bind",
+			flags: []string{`-serf-wan-bind`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.SerfBindAddrWAN = "a"
 			},
-			{
-				desc:  "-server",
-				flags: []string{`-server`},
-				rt: RuntimeConfig{
-					ServerMode:     true,
-					SkipLeaveOnInt: true,
-					NodeName:       "nodex",
-				},
+		},
+		{
+			desc:  "-server",
+			flags: []string{`-server`},
+			patch: func(rt *RuntimeConfig) {
+				rt.ServerMode = true
+				rt.LeaveOnTerm = false
+				rt.SkipLeaveOnInt = true
 			},
-			{
-				desc:  "-syslog",
-				flags: []string{`-syslog`},
-				rt: RuntimeConfig{
-					EnableSyslog: true,
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+		},
+		{
+			desc:  "-syslog",
+			flags: []string{`-syslog`},
+			patch: func(rt *RuntimeConfig) {
+				rt.EnableSyslog = true
 			},
-			{
-				desc:  "-ui",
-				flags: []string{`-ui`},
-				rt: RuntimeConfig{
-					EnableUI:    true,
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+		},
+		{
+			desc:  "-ui",
+			flags: []string{`-ui`},
+			patch: func(rt *RuntimeConfig) {
+				rt.EnableUI = true
 			},
-			{
-				desc:  "-ui-dir",
-				flags: []string{`-ui-dir`, `a`},
-				rt: RuntimeConfig{
-					UIDir:       "a",
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+		},
+		{
+			desc:  "-ui-dir",
+			flags: []string{`-ui-dir`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.UIDir = "a"
 			},
+		},
 
-			// ------------------------------------------------------------
-			// deprecated flags
-			//
+		// ------------------------------------------------------------
+		// deprecated flags
+		//
 
-			{
-				desc:  "-atlas",
-				flags: []string{`-atlas`, `a`},
-				warns: []string{`'-atlas' is deprecated`},
-				rt: RuntimeConfig{
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+		{
+			desc:  "-atlas",
+			flags: []string{`-atlas`, `a`},
+			warns: []string{`'-atlas' is deprecated`},
+		},
+		{
+			desc:  "-atlas-join",
+			flags: []string{`-atlas-join`},
+			warns: []string{`'-atlas-join' is deprecated`},
+		},
+		{
+			desc:  "-atlas-endpoint",
+			flags: []string{`-atlas-endpoint`, `a`},
+			warns: []string{`'-atlas-endpoint' is deprecated`},
+		},
+		{
+			desc:  "-atlas-token",
+			flags: []string{`-atlas-token`, `a`},
+			warns: []string{`'-atlas-token' is deprecated`},
+		},
+		{
+			desc:  "-dc",
+			flags: []string{`-dc`, `a`},
+			warns: []string{`'-dc' is deprecated. Use '-datacenter' instead`},
+			patch: func(rt *RuntimeConfig) {
+				rt.Datacenter = "a"
 			},
-			{
-				desc:  "-atlas-join",
-				flags: []string{`-atlas-join`},
-				warns: []string{`'-atlas-join' is deprecated`},
-				rt: RuntimeConfig{
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+		},
+		{
+			desc:  "-retry-join-azure-tag-name",
+			flags: []string{`-retry-join-azure-tag-name`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"provider=azure tag_name=a"}
 			},
-			{
-				desc:  "-atlas-endpoint",
-				flags: []string{`-atlas-endpoint`, `a`},
-				warns: []string{`'-atlas-endpoint' is deprecated`},
-				rt: RuntimeConfig{
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_name=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-azure-tag-value",
+			flags: []string{`-retry-join-azure-tag-value`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"provider=azure tag_value=a"}
 			},
-			{
-				desc:  "-atlas-token",
-				flags: []string{`-atlas-token`, `a`},
-				warns: []string{`'-atlas-token' is deprecated`},
-				rt: RuntimeConfig{
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_value=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-ec2-region",
+			flags: []string{`-retry-join-ec2-region`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"provider=aws region=a"}
 			},
-			{
-				desc:  "-dc",
-				flags: []string{`-dc`, `a`},
-				warns: []string{`'-dc' is deprecated. Use '-datacenter' instead`},
-				rt: RuntimeConfig{
-					Datacenter:  "a",
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws region=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-ec2-tag-key",
+			flags: []string{`-retry-join-ec2-tag-key`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"provider=aws tag_key=a"}
 			},
-			{
-				desc:  "-retry-join-azure-tag-name",
-				flags: []string{`-retry-join-azure-tag-name`, `a`},
-				warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_name=a" to retry_join.`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"provider=azure tag_name=a"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_key=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-ec2-tag-value",
+			flags: []string{`-retry-join-ec2-tag-value`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"provider=aws tag_value=a"}
 			},
-			{
-				desc:  "-retry-join-azure-tag-value",
-				flags: []string{`-retry-join-azure-tag-value`, `a`},
-				warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_value=a" to retry_join.`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"provider=azure tag_value=a"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_value=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-gce-credentials-file",
+			flags: []string{`-retry-join-gce-credentials-file`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"provider=gce credentials_file=a"}
 			},
-			{
-				desc:  "-retry-join-ec2-region",
-				flags: []string{`-retry-join-ec2-region`, `a`},
-				warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws region=a" to retry_join.`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"provider=aws region=a"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-gce-project-name",
+			flags: []string{`-retry-join-gce-project-name`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"provider=gce project_name=a"}
 			},
-			{
-				desc:  "-retry-join-ec2-tag-key",
-				flags: []string{`-retry-join-ec2-tag-key`, `a`},
-				warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_key=a" to retry_join.`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"provider=aws tag_key=a"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce project_name=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-gce-tag-value",
+			flags: []string{`-retry-join-gce-tag-value`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"provider=gce tag_value=a"}
 			},
-			{
-				desc:  "-retry-join-ec2-tag-value",
-				flags: []string{`-retry-join-ec2-tag-value`, `a`},
-				warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_value=a" to retry_join.`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"provider=aws tag_value=a"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce tag_value=a" to retry_join.`},
+		},
+		{
+			desc:  "-retry-join-gce-zone-pattern",
+			flags: []string{`-retry-join-gce-zone-pattern`, `a`},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"provider=gce zone_pattern=a"}
 			},
-			{
-				desc:  "-retry-join-gce-credentials-file",
-				flags: []string{`-retry-join-gce-credentials-file`, `a`},
-				warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden" to retry_join.`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"provider=gce credentials_file=a"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
-			},
-			{
-				desc:  "-retry-join-gce-project-name",
-				flags: []string{`-retry-join-gce-project-name`, `a`},
-				warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce project_name=a" to retry_join.`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"provider=gce project_name=a"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
-			},
-			{
-				desc:  "-retry-join-gce-tag-value",
-				flags: []string{`-retry-join-gce-tag-value`, `a`},
-				warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce tag_value=a" to retry_join.`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"provider=gce tag_value=a"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
-			},
-			{
-				desc:  "-retry-join-gce-zone-pattern",
-				flags: []string{`-retry-join-gce-zone-pattern`, `a`},
-				warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce zone_pattern=a" to retry_join.`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"provider=gce zone_pattern=a"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
-			},
+			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce zone_pattern=a" to retry_join.`},
+		},
 
-			// ------------------------------------------------------------
-			// deprecated fields
-			//
+		// ------------------------------------------------------------
+		// deprecated fields
+		//
 
-			{
-				desc:  "check.service_id alias",
-				json:  []string{`{"check":{ "service_id":"d", "serviceid":"dd" }}`},
-				hcl:   []string{`check = { service_id="d" serviceid="dd" }`},
-				warns: []string{`config: "serviceid" is deprecated in check definitions. Please use "service_id" instead.`},
-				rt: RuntimeConfig{
-					Checks:      []*structs.CheckDefinition{{ServiceID: "dd"}},
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+		{
+			desc: "check.service_id alias",
+			json: []string{`{"check":{ "service_id":"d", "serviceid":"dd" }}`},
+			hcl:  []string{`check = { service_id="d" serviceid="dd" }`},
+			patch: func(rt *RuntimeConfig) {
+				rt.Checks = []*structs.CheckDefinition{{ServiceID: "dd"}}
 			},
-			{
-				desc:  "check.docker_container_id alias",
-				json:  []string{`{"check":{ "docker_container_id":"k", "dockercontainerid":"kk" }}`},
-				hcl:   []string{`check = { docker_container_id="k" dockercontainerid="kk" }`},
-				warns: []string{`config: "dockercontainerid" is deprecated in check definitions. Please use "docker_container_id" instead.`},
-				rt: RuntimeConfig{
-					Checks:      []*structs.CheckDefinition{{DockerContainerID: "kk"}},
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			warns: []string{`config: "serviceid" is deprecated in check definitions. Please use "service_id" instead.`},
+		},
+		{
+			desc: "check.docker_container_id alias",
+			json: []string{`{"check":{ "docker_container_id":"k", "dockercontainerid":"kk" }}`},
+			hcl:  []string{`check = { docker_container_id="k" dockercontainerid="kk" }`},
+			patch: func(rt *RuntimeConfig) {
+				rt.Checks = []*structs.CheckDefinition{{DockerContainerID: "kk"}}
 			},
-			{
-				desc:  "check.tls_skip_verify alias",
-				json:  []string{`{"check":{ "tls_skip_verify":true, "tlsskipverify":false }}`},
-				hcl:   []string{`check = { tls_skip_verify=true tlsskipverify=false }`},
-				warns: []string{`config: "tlsskipverify" is deprecated in check definitions. Please use "tls_skip_verify" instead.`},
-				rt: RuntimeConfig{
-					Checks:      []*structs.CheckDefinition{{TLSSkipVerify: false}},
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			warns: []string{`config: "dockercontainerid" is deprecated in check definitions. Please use "docker_container_id" instead.`},
+		},
+		{
+			desc: "check.tls_skip_verify alias",
+			json: []string{`{"check":{ "tls_skip_verify":true, "tlsskipverify":false }}`},
+			hcl:  []string{`check = { tls_skip_verify=true tlsskipverify=false }`},
+			patch: func(rt *RuntimeConfig) {
+				rt.Checks = []*structs.CheckDefinition{{TLSSkipVerify: false}}
 			},
-			{
-				desc:  "check.deregister_critical_service_after alias",
-				json:  []string{`{"check":{ "deregister_critical_service_after":"5s", "deregistercriticalserviceafter": "10s" }}`},
-				hcl:   []string{`check = { deregister_critical_service_after="5s" deregistercriticalserviceafter="10s"}`},
-				warns: []string{`config: "deregistercriticalserviceafter" is deprecated in check definitions. Please use "deregister_critical_service_after" instead.`},
-				rt: RuntimeConfig{
-					Checks:      []*structs.CheckDefinition{{DeregisterCriticalServiceAfter: 10 * time.Second}},
-					LeaveOnTerm: true,
-					NodeName:    "nodex",
-				},
+			warns: []string{`config: "tlsskipverify" is deprecated in check definitions. Please use "tls_skip_verify" instead.`},
+		},
+		{
+			desc: "check.deregister_critical_service_after alias",
+			json: []string{`{"check":{ "deregister_critical_service_after":"5s", "deregistercriticalserviceafter": "10s" }}`},
+			hcl:  []string{`check = { deregister_critical_service_after="5s" deregistercriticalserviceafter="10s"}`},
+			patch: func(rt *RuntimeConfig) {
+				rt.Checks = []*structs.CheckDefinition{{DeregisterCriticalServiceAfter: 10 * time.Second}}
 			},
-			{
-				desc:  "http_api_response_headers",
-				json:  []string{`{"http_api_response_headers":{"a":"b","c":"d"}}`},
-				hcl:   []string{`http_api_response_headers = {"a"="b" "c"="d"}`},
-				warns: []string{`config: "http_api_response_headers" is deprecated. Please use "http_config.response_headers" instead.`},
-				rt: RuntimeConfig{
-					LeaveOnTerm:         true,
-					NodeName:            "nodex",
-					HTTPResponseHeaders: map[string]string{"a": "b", "c": "d"},
-				},
+			warns: []string{`config: "deregistercriticalserviceafter" is deprecated in check definitions. Please use "deregister_critical_service_after" instead.`},
+		},
+		{
+			desc: "http_api_response_headers",
+			json: []string{`{"http_api_response_headers":{"a":"b","c":"d"}}`},
+			hcl:  []string{`http_api_response_headers = {"a"="b" "c"="d"}`},
+			patch: func(rt *RuntimeConfig) {
+				rt.HTTPResponseHeaders = map[string]string{"a": "b", "c": "d"}
 			},
-			{
-				desc: "retry_join_azure",
-				json: []string{`{
+			warns: []string{`config: "http_api_response_headers" is deprecated. Please use "http_config.response_headers" instead.`},
+		},
+		{
+			desc: "retry_join_azure",
+			json: []string{`{
 					"retry_join_azure":{
 						"tag_name": "a",
 						"tag_value": "b",
@@ -619,7 +526,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 						"secret_access_key": "f"
 					}
 				}`},
-				hcl: []string{`
+			hcl: []string{`
 					retry_join_azure = {
 						tag_name = "a"
 						tag_value = "b"
@@ -629,16 +536,14 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 						secret_access_key = "f"
 					}
 				`},
-				warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure client_id=hidden secret_access_key=hidden subscription_id=hidden tag_name=a tag_value=b tenant_id=hidden" to retry_join.`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"provider=azure client_id=e secret_access_key=f subscription_id=c tag_name=a tag_value=b tenant_id=d"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"provider=azure client_id=e secret_access_key=f subscription_id=c tag_name=a tag_value=b tenant_id=d"}
 			},
-			{
-				desc: "retry_join_ec2",
-				json: []string{`{
+			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure client_id=hidden secret_access_key=hidden subscription_id=hidden tag_name=a tag_value=b tenant_id=hidden" to retry_join.`},
+		},
+		{
+			desc: "retry_join_ec2",
+			json: []string{`{
 					"retry_join_ec2":{
 						"tag_key": "a",
 						"tag_value": "b",
@@ -647,7 +552,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 						"secret_access_key": "e"
 					}
 				}`},
-				hcl: []string{`
+			hcl: []string{`
 					retry_join_ec2 = {
 						tag_key = "a"
 						tag_value = "b"
@@ -656,16 +561,14 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 						secret_access_key = "e"
 					}
 				`},
-				warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws access_key_id=hidden region=c secret_access_key=hidden tag_key=a tag_value=b" to retry_join.`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"provider=aws access_key_id=d region=c secret_access_key=e tag_key=a tag_value=b"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"provider=aws access_key_id=d region=c secret_access_key=e tag_key=a tag_value=b"}
 			},
-			{
-				desc: "retry_join_gce",
-				json: []string{`{
+			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws access_key_id=hidden region=c secret_access_key=hidden tag_key=a tag_value=b" to retry_join.`},
+		},
+		{
+			desc: "retry_join_gce",
+			json: []string{`{
 					"retry_join_gce":{
 						"project_name": "a",
 						"zone_pattern": "b",
@@ -673,7 +576,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 						"credentials_file": "d"
 					}
 				}`},
-				hcl: []string{`
+			hcl: []string{`
 					retry_join_gce = {
 						project_name = "a"
 						zone_pattern = "b"
@@ -681,70 +584,57 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 						credentials_file = "d"
 					}
 				`},
-				warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden project_name=a tag_value=c zone_pattern=b" to retry_join.`},
-				rt: RuntimeConfig{
-					RetryJoinLAN: []string{"provider=gce credentials_file=d project_name=a tag_value=c zone_pattern=b"},
-					LeaveOnTerm:  true,
-					NodeName:     "nodex",
-				},
+			patch: func(rt *RuntimeConfig) {
+				rt.RetryJoinLAN = []string{"provider=gce credentials_file=d project_name=a tag_value=c zone_pattern=b"}
 			},
+			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden project_name=a tag_value=c zone_pattern=b" to retry_join.`},
+		},
 
-			{
-				desc:  "telemetry.dogstatsd_addr alias",
-				json:  []string{`{"dogstatsd_addr":"a", "telemetry":{"dogstatsd_addr": "b"}}`},
-				hcl:   []string{`dogstatsd_addr = "a" telemetry = { dogstatsd_addr = "b"}`},
-				warns: []string{`config: "dogstatsd_addr" is deprecated. Please use "telemetry.dogstatsd_addr" instead.`},
-				rt: RuntimeConfig{
-					TelemetryDogstatsdAddr: "a",
-					LeaveOnTerm:            true,
-					NodeName:               "nodex",
-				},
+		{
+			desc:  "telemetry.dogstatsd_addr alias",
+			json:  []string{`{"dogstatsd_addr":"a", "telemetry":{"dogstatsd_addr": "b"}}`},
+			hcl:   []string{`dogstatsd_addr = "a" telemetry = { dogstatsd_addr = "b"}`},
+			warns: []string{`config: "dogstatsd_addr" is deprecated. Please use "telemetry.dogstatsd_addr" instead.`},
+			patch: func(rt *RuntimeConfig) {
+				rt.TelemetryDogstatsdAddr = "a"
 			},
-			{
-				desc:  "telemetry.dogstatsd_tags alias",
-				json:  []string{`{"dogstatsd_tags":["a", "b"], "telemetry": { "dogstatsd_tags": ["c", "d"]}}`},
-				hcl:   []string{`dogstatsd_tags = ["a", "b"] telemetry = { dogstatsd_tags = ["c", "d"] }`},
-				warns: []string{`config: "dogstatsd_tags" is deprecated. Please use "telemetry.dogstatsd_tags" instead.`},
-				rt: RuntimeConfig{
-					TelemetryDogstatsdTags: []string{"a", "b", "c", "d"},
-					LeaveOnTerm:            true,
-					NodeName:               "nodex",
-				},
+		},
+		{
+			desc:  "telemetry.dogstatsd_tags alias",
+			json:  []string{`{"dogstatsd_tags":["a", "b"], "telemetry": { "dogstatsd_tags": ["c", "d"]}}`},
+			hcl:   []string{`dogstatsd_tags = ["a", "b"] telemetry = { dogstatsd_tags = ["c", "d"] }`},
+			warns: []string{`config: "dogstatsd_tags" is deprecated. Please use "telemetry.dogstatsd_tags" instead.`},
+			patch: func(rt *RuntimeConfig) {
+				rt.TelemetryDogstatsdTags = []string{"a", "b", "c", "d"}
 			},
-			{
-				desc:  "telemetry.statsd_addr alias",
-				json:  []string{`{"statsd_addr":"a", "telemetry":{"statsd_addr": "b"}}`},
-				hcl:   []string{`statsd_addr = "a" telemetry = { statsd_addr = "b" }`},
-				warns: []string{`config: "statsd_addr" is deprecated. Please use "telemetry.statsd_addr" instead.`},
-				rt: RuntimeConfig{
-					TelemetryStatsdAddr: "a",
-					LeaveOnTerm:         true,
-					NodeName:            "nodex",
-				},
+		},
+		{
+			desc:  "telemetry.statsd_addr alias",
+			json:  []string{`{"statsd_addr":"a", "telemetry":{"statsd_addr": "b"}}`},
+			hcl:   []string{`statsd_addr = "a" telemetry = { statsd_addr = "b" }`},
+			warns: []string{`config: "statsd_addr" is deprecated. Please use "telemetry.statsd_addr" instead.`},
+			patch: func(rt *RuntimeConfig) {
+				rt.TelemetryStatsdAddr = "a"
 			},
-			{
-				desc:  "telemetry.statsite_addr alias",
-				json:  []string{`{"statsite_addr":"a", "telemetry":{ "statsite_addr": "b" }}`},
-				hcl:   []string{`statsite_addr = "a" telemetry = { statsite_addr = "b"}`},
-				warns: []string{`config: "statsite_addr" is deprecated. Please use "telemetry.statsite_addr" instead.`},
-				rt: RuntimeConfig{
-					TelemetryStatsiteAddr: "a",
-					LeaveOnTerm:           true,
-					NodeName:              "nodex",
-				},
+		},
+		{
+			desc:  "telemetry.statsite_addr alias",
+			json:  []string{`{"statsite_addr":"a", "telemetry":{ "statsite_addr": "b" }}`},
+			hcl:   []string{`statsite_addr = "a" telemetry = { statsite_addr = "b"}`},
+			warns: []string{`config: "statsite_addr" is deprecated. Please use "telemetry.statsite_addr" instead.`},
+			patch: func(rt *RuntimeConfig) {
+				rt.TelemetryStatsiteAddr = "a"
 			},
-			{
-				desc:  "telemetry.statsite_prefix alias",
-				json:  []string{`{"statsite_prefix":"a", "telemetry":{ "statsite_prefix": "b" }}`},
-				hcl:   []string{`statsite_prefix = "a" telemetry = { statsite_prefix = "b" }`},
-				warns: []string{`config: "statsite_prefix" is deprecated. Please use "telemetry.statsite_prefix" instead.`},
-				rt: RuntimeConfig{
-					TelemetryStatsitePrefix: "a",
-					LeaveOnTerm:             true,
-					NodeName:                "nodex",
-				},
+		},
+		{
+			desc:  "telemetry.statsite_prefix alias",
+			json:  []string{`{"statsite_prefix":"a", "telemetry":{ "statsite_prefix": "b" }}`},
+			hcl:   []string{`statsite_prefix = "a" telemetry = { statsite_prefix = "b" }`},
+			warns: []string{`config: "statsite_prefix" is deprecated. Please use "telemetry.statsite_prefix" instead.`},
+			patch: func(rt *RuntimeConfig) {
+				rt.TelemetryStatsitePrefix = "a"
 			},
-		*/
+		},
 
 		// ------------------------------------------------------------
 		// ports and addresses
