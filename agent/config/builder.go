@@ -73,6 +73,10 @@ type Builder struct {
 	// parsing the configuration.
 	Warnings []string
 
+	// Hostname returns the hostname of the machine. If nil, os.Hostname
+	// is called.
+	Hostname func() (string, error)
+
 	// err contains the first error that occurred during
 	// building the runtime configuration.
 	err error
@@ -242,12 +246,6 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	var dnsServiceTTL = map[string]time.Duration{}
 	for k, v := range c.DNS.ServiceTTL {
 		dnsServiceTTL[k] = b.durationVal(&v)
-	}
-
-	var tlsCipherSuites []uint16
-	tlsCipherSuites, err = tlsutil.ParseCiphers(b.stringVal(c.TLSCipherSuites))
-	if err != nil {
-		return RuntimeConfig{}, fmt.Errorf("invalid tls cipher suites: %s", err)
 	}
 
 	leaveOnTerm := !b.boolVal(c.ServerMode)
@@ -573,7 +571,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		LogLevel:                    b.stringVal(c.LogLevel),
 		NodeID:                      b.stringVal(c.NodeID),
 		NodeMeta:                    c.NodeMeta,
-		NodeName:                    b.stringVal(c.NodeName),
+		NodeName:                    b.nodeName(c.NodeName),
 		NonVotingServer:             b.boolVal(c.NonVotingServer),
 		PidFile:                     b.stringVal(c.PidFile),
 		RPCProtocol:                 b.intVal(c.RPCProtocol),
@@ -599,7 +597,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		StartJoinAddrsLAN:           c.StartJoinAddrsLAN,
 		StartJoinAddrsWAN:           c.StartJoinAddrsWAN,
 		SyslogFacility:              b.stringVal(c.SyslogFacility),
-		TLSCipherSuites:             tlsCipherSuites,
+		TLSCipherSuites:             b.tlsCipherSuites(c.TLSCipherSuites),
 		TLSMinVersion:               b.stringVal(c.TLSMinVersion),
 		TLSPreferServerCipherSuites: b.boolVal(c.TLSPreferServerCipherSuites),
 		TaggedAddresses:             c.TaggedAddresses,
@@ -689,6 +687,14 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 
 	if ipaddr.IsAny(rt.AdvertiseAddrWAN) {
 		return fmt.Errorf("Advertise WAN address cannot be %s", rt.AdvertiseAddrWAN)
+	}
+
+	if rt.DNSUDPAnswerLimit <= 0 {
+		return fmt.Errorf("dns_config.udp_answer_limit must be > 0")
+	}
+
+	if rt.NodeName == "" {
+		return fmt.Errorf("Node name cannot be empty")
 	}
 
 	return nil
@@ -885,4 +891,38 @@ func (b *Builder) joinHostPort(host string, port int) string {
 
 func (b *Builder) isSocket(s string) bool {
 	return strings.HasPrefix(s, "unix://")
+}
+
+func (b *Builder) tlsCipherSuites(v *string) []uint16 {
+	if b.err != nil || v == nil {
+		return nil
+	}
+
+	var a []uint16
+	a, err := tlsutil.ParseCiphers(*v)
+	if err != nil {
+		b.err = fmt.Errorf("invalid tls cipher suites: %s", err)
+	}
+	return a
+}
+
+func (b *Builder) nodeName(v *string) string {
+	if b.err != nil {
+		return ""
+	}
+
+	nodeName := b.stringVal(v)
+	if nodeName == "" {
+		fn := b.Hostname
+		if fn == nil {
+			fn = os.Hostname
+		}
+		name, err := fn()
+		if err != nil {
+			b.err = fmt.Errorf("Error determining node name: %s", err)
+			return ""
+		}
+		nodeName = name
+	}
+	return strings.TrimSpace(nodeName)
 }

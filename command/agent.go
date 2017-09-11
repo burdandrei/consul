@@ -232,34 +232,34 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 		cfg = agent.DevConfig()
 	}
 
-	if len(cfgFiles) > 0 {
-		fileConfig, err := agent.ReadConfigPaths(cfgFiles)
-		if err != nil {
-			cmd.UI.Error(err.Error())
-			return nil
-		}
+	// done: if len(cfgFiles) > 0 {
+	// done: 	fileConfig, err := agent.ReadConfigPaths(cfgFiles)
+	// done: 	if err != nil {
+	// done: 		cmd.UI.Error(err.Error())
+	// done: 		return nil
+	// done: 	}
 
-		cfg = agent.MergeConfig(cfg, fileConfig)
-	}
+	// done: 	cfg = agent.MergeConfig(cfg, fileConfig)
+	// done: }
 
 	// done: cmdCfg.DNSRecursors = append(cmdCfg.DNSRecursors, dnsRecursors...)
 
 	// done: cfg = agent.MergeConfig(cfg, &cmdCfg)
 	// done: disableHostNodeID.Merge(cfg.DisableHostNodeID)
 
-	if cfg.NodeName == "" {
-		hostname, err := os.Hostname()
-		if err != nil {
-			cmd.UI.Error(fmt.Sprintf("Error determining node name: %s", err))
-			return nil
-		}
-		cfg.NodeName = hostname
-	}
-	cfg.NodeName = strings.TrimSpace(cfg.NodeName)
-	if cfg.NodeName == "" {
-		cmd.UI.Error("Node name can not be empty")
-		return nil
-	}
+	// done: if cfg.NodeName == "" {
+	// done: 	hostname, err := os.Hostname()
+	// done: 	if err != nil {
+	// done: 		cmd.UI.Error(fmt.Sprintf("Error determining node name: %s", err))
+	// done: 		return nil
+	// done: 	}
+	// done: 	cfg.NodeName = hostname
+	// done: }
+	// done: cfg.NodeName = strings.TrimSpace(cfg.NodeName)
+	// done: if cfg.NodeName == "" {
+	// done: 	cmd.UI.Error("Node name can not be empty")
+	// done: 	return nil
+	// done: }
 
 	// Make sure LeaveOnTerm and SkipLeaveOnInt are set to the right
 	// defaults based on the agent's mode (client or server).
@@ -314,9 +314,9 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 	}
 
 	// Verify DNS settings
-	if cfg.DNSConfig.UDPAnswerLimit < 1 {
-		cmd.UI.Error(fmt.Sprintf("dns_config.udp_answer_limit %d too low, must always be greater than zero", cfg.DNSConfig.UDPAnswerLimit))
-	}
+	// done: if cfg.DNSConfig.UDPAnswerLimit < 1 {
+	// done: 	cmd.UI.Error(fmt.Sprintf("dns_config.udp_answer_limit %d too low, must always be greater than zero", cfg.DNSConfig.UDPAnswerLimit))
+	// done: }
 
 	if cfg.EncryptKey != "" {
 		if _, err := cfg.EncryptBytes(); err != nil {
