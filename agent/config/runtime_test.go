@@ -21,6 +21,36 @@ import (
 // values, e.g. 'a' or 1 instead of 'servicex' or 3306.
 
 func TestConfigFlagsAndEdgecases(t *testing.T) {
+	randomString := func(n int) string {
+		s := ""
+		for ; n > 0; n-- {
+			s += "x"
+		}
+		return s
+	}
+
+	metaPairs := func(n int, format string) string {
+		var s []string
+		for i := 0; i < n; i++ {
+			switch format {
+			case "json":
+				s = append(s, fmt.Sprintf(`"%d":"%d"`, i, i))
+			case "hcl":
+				s = append(s, fmt.Sprintf(`"%d"="%d"`, i, i))
+			default:
+				panic("invalid format: " + format)
+			}
+		}
+		switch format {
+		case "json":
+			return strings.Join(s, ",")
+		case "hcl":
+			return strings.Join(s, " ")
+		default:
+			panic("invalid format: " + format)
+		}
+	}
+
 	tests := []struct {
 		desc     string
 		flags    []string
@@ -1244,26 +1274,72 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			hostname: func() (string, error) { return "", nil },
 			verr:     errors.New("dns_config.udp_answer_limit must be > 0"),
 		},
+		{
+			desc:  "node_meta key too long",
+			flags: []string{`-datacenter=a`},
+			json: []string{
+				`{ "dns_config": { "udp_answer_limit": 1 } }`,
+				`{ "node_meta": { "` + randomString(130) + `": "a" } }`,
+			},
+			hcl: []string{
+				`dns_config = { udp_answer_limit = 1 }`,
+				`node_meta = { "` + randomString(130) + `" = "a" }`,
+			},
+			verr: errors.New("Failed to parse node metadata: Couldn't load metadata pair ('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'a'): Key is too long (limit: 128 characters)"),
+		},
+		{
+			desc:  "node_meta value too long",
+			flags: []string{`-datacenter=a`},
+			json: []string{
+				`{ "dns_config": { "udp_answer_limit": 1 } }`,
+				`{ "node_meta": { "a": "` + randomString(520) + `" } }`,
+			},
+			hcl: []string{
+				`dns_config = { udp_answer_limit = 1 }`,
+				`node_meta = { "a" = "` + randomString(520) + `" }`,
+			},
+			verr: errors.New("Failed to parse node metadata: Couldn't load metadata pair ('a', 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'): Value is too long (limit: 512 characters)"),
+		},
+		{
+			desc:  "node_meta too many keys",
+			flags: []string{`-datacenter=a`},
+			json: []string{
+				`{ "dns_config": { "udp_answer_limit": 1 } }`,
+				`{ "node_meta": {` + metaPairs(70, "json") + `} }`,
+			},
+			hcl: []string{
+				`dns_config = { udp_answer_limit = 1 }`,
+				`node_meta = {` + metaPairs(70, "hcl") + ` }`,
+			},
+			verr: errors.New("Failed to parse node metadata: Node metadata cannot contain more than 64 key/value pairs"),
+		},
 	}
 
 	for _, tt := range tests {
-		for _, format := range []string{"json", "hcl"} {
+		for pass, format := range []string{"json", "hcl"} {
+			// when we test only flags then there are no JSON or HCL
+			// sources and we need to make only one pass over the
+			// tests.
+			flagsOnly := len(tt.json) == 0 && len(tt.hcl) == 0
+			if flagsOnly && pass > 0 {
+				continue
+			}
+
+			// json and hcl sources need to be in sync
+			// to make sure we're generating the same config
 			if len(tt.json) != len(tt.hcl) {
 				t.Fatal("JSON and HCL test case out of sync")
 			}
 
+			// select the source
 			srcs := tt.json
 			if format == "hcl" {
 				srcs = tt.hcl
 			}
 
-			// ugly hack to skip second run for flag-only tests
-			if len(srcs) == 0 && format == "hcl" {
-				continue
-			}
-
+			// build the description
 			var desc []string
-			if len(srcs) > 0 {
+			if !flagsOnly {
 				desc = append(desc, format)
 			}
 			if tt.desc != "" {
@@ -1277,41 +1353,74 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					t.Fatalf("ParseFlags failed: %s", err)
 				}
 
+				// mock the hostname function unless a mock is provided
+				//
+				// Unfortunately, this means that all resulting runtime
+				// configs need to have a 'NodeName: "nodex",' entry but
+				// we already need to do something similar for the
+				// LeaveOnTerm flag which is set to true when server
+				// mode is off (which is the default). They are kept at
+				// the end of the struct to make amending the tests
+				// easier.
+				//
+				// The runtime config creation is split between building
+				// (syntax) and validation (semantics) to simplify
+				// testing but for these two fields I couldn't come up
+				// with a way to mitigate this without making the
+				// RuntimeConfig a pointer and allowing Validate to
+				// modify it which would then have to be checked again.
+				//
+				// By keeping RuntimeConfig "by value" we don't allow
+				// durable modifications to it which keeps it consistent
+				// unless explitly desired otherwise.
+				//
+				// This may needs revisiting once I get to config
+				// reloading, though.
 				hostnameFn := tt.hostname
 				if hostnameFn == nil {
 					hostnameFn = func() (string, error) { return "nodex", nil }
 				}
+
+				// create the builder with the flags
 				b := &Builder{
 					Flags:    flags,
 					Default:  &Config{},
 					Hostname: hostnameFn,
 				}
+
+				// read the source fragements
 				for _, src := range srcs {
 					if err := b.ReadBytes([]byte(src), format); err != nil {
 						t.Fatalf("ReadBytes failed for %q: %s", src, err)
 					}
 				}
+
+				// build/merge the config fragments
 				rt, err := b.Build()
 				if got, want := err, tt.err; !reflect.DeepEqual(got, want) {
 					t.Fatalf("got error %v want %v", got, want)
 				}
 
+				// only run the validate step if we expect a validation error
+				// otherwise, we have to satisfy all pre-conditions for every test
 				if tt.verr != nil {
 					if got, want := b.Validate(rt), tt.verr; !reflect.DeepEqual(got, want) {
 						t.Fatalf("validation error\ngot:  %v\nwant: %v", got, want)
 					}
 				}
 
+				// check the warnings
 				if !verify.Values(t, "warnings", b.Warnings, tt.warns) {
 					t.FailNow()
 				}
 
-				// only validate runtime config if there are no expected errors
+				// only validate runtime config if there are no validation errors
 				if tt.verr != nil {
 					return
 				}
 
-				if !verify.Values(t, "", rt, tt.rt) {
+				// verify the runtime config
+				if got, want := rt, tt.rt; !verify.Values(t, "", got, want) {
 					t.FailNow()
 				}
 			})

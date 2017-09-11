@@ -17,7 +17,6 @@ import (
 	"github.com/armon/go-metrics/circonus"
 	"github.com/armon/go-metrics/datadog"
 	"github.com/hashicorp/consul/agent"
-	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/lib"
 	"github.com/hashicorp/consul/logger"
 	"github.com/hashicorp/consul/watch"
@@ -215,17 +214,17 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 	// done: 	cmdCfg.RetryIntervalWan = dur
 	// done: }
 
-	if len(nodeMeta) > 0 {
-		cmdCfg.Meta = make(map[string]string)
-		for _, entry := range nodeMeta {
-			key, value := agent.ParseMetaPair(entry)
-			cmdCfg.Meta[key] = value
-		}
-		if err := structs.ValidateMetadata(cmdCfg.Meta, false); err != nil {
-			cmd.UI.Error(fmt.Sprintf("Failed to parse node metadata: %v", err))
-			return nil
-		}
-	}
+	// done: if len(nodeMeta) > 0 {
+	// done: 	cmdCfg.Meta = make(map[string]string)
+	// done: 	for _, entry := range nodeMeta {
+	// done: 		key, value := agent.ParseMetaPair(entry)
+	// done: 		cmdCfg.Meta[key] = value
+	// done: 	}
+	// done: 	if err := structs.ValidateMetadata(cmdCfg.Meta, false); err != nil {
+	// done: 		cmd.UI.Error(fmt.Sprintf("Failed to parse node metadata: %v", err))
+	// done: 		return nil
+	// done: 	}
+	// done: }
 
 	cfg := agent.DefaultConfig()
 	if dev {

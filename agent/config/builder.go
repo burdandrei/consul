@@ -697,6 +697,10 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 		return fmt.Errorf("Node name cannot be empty")
 	}
 
+	if err := structs.ValidateMetadata(rt.NodeMeta, false); err != nil {
+		return fmt.Errorf("Failed to parse node metadata: %v", err)
+	}
+
 	return nil
 }
 
