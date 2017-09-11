@@ -244,7 +244,7 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 
 	// done: cmdCfg.DNSRecursors = append(cmdCfg.DNSRecursors, dnsRecursors...)
 
-	cfg = agent.MergeConfig(cfg, &cmdCfg)
+	// done: cfg = agent.MergeConfig(cfg, &cmdCfg)
 	disableHostNodeID.Merge(cfg.DisableHostNodeID)
 
 	if cfg.NodeName == "" {

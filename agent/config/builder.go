@@ -22,6 +22,30 @@ import (
 	"github.com/hashicorp/hcl"
 )
 
+// Builder constructs a valid runtime configuration from multiple
+// configuration fragments.
+//
+// To build the runtime configuration first call Build() which merges
+// the fragments in a pre-defined order, converts the data types and
+// structures into their final form and performs the syntactic
+// validation.
+//
+// The fragments are merged in the following order:
+//
+//  * default configuration
+//  * config files in alphabetical order
+//  * command line arguments
+//
+// The config fragments are merged sequentially and later values
+// overwrite previously set values. Slice values are merged by
+// concatenating the two slices.
+//
+// Then call Validate() to perform the semantic validation to ensure
+// that the configuration is ready to be used.
+//
+// Splitting the construction into two phases greatly simplifies testing
+// since not all pre-conditions have to be satisfied when performing
+// syntactical tests.
 type Builder struct {
 	// Flags contains the parsed command line arguments.
 	Flags Flags
@@ -298,9 +322,6 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	serfBindAddrWAN := b.singleIPTemplateVal("serf bind wan", c.SerfBindAddrWAN)
 
 	// todo(fs): port SetupTaggedAndAdvertiseAddrs
-	// todo(fs): check ip addrs are valid
-	// todo(fs): check sockets not allowed for advertise and serf bind addrs
-	// todo(fs): port VerifyUniqueListeners
 
 	// todo(fs): port existing validation from command/agent.go
 	// todo(fs): support dev config
@@ -582,11 +603,20 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		VerifyServerHostname:        b.boolVal(c.VerifyServerHostname),
 	}
 
+	if rt.BootstrapExpect == 1 {
+		rt.Bootstrap = true
+		rt.BootstrapExpect = 0
+		b.warn("BootstrapExpect is set to 1; this is the same as Bootstrap mode.")
+	}
+
 	return rt, b.err
 }
 
-// Validate checks the configuration for non-recoverable errors.
+// Validate performs semantical validation of the runtime configuration.
 func (b *Builder) Validate(rt RuntimeConfig) error {
+	// todo(fs): check ip addrs are valid
+	// todo(fs): check sockets not allowed for advertise and serf bind addrs
+	// todo(fs): port VerifyUniqueListeners
 
 	if rt.AutopilotMaxTrailingLogs < 0 {
 		return fmt.Errorf("autopilot.max_trailing_logs < 0")
@@ -621,12 +651,6 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 
 	if rt.BootstrapExpect > 0 && rt.Bootstrap {
 		return fmt.Errorf("BootstrapExpect mode and Bootstrap mode are mutually exclusive")
-	}
-
-	if rt.BootstrapExpect == 1 {
-		rt.Bootstrap = true
-		rt.BootstrapExpect = 0
-		b.warn("BootstrapExpect is set to 1; this is the same as Bootstrap mode.")
 	}
 
 	if rt.BootstrapExpect > 1 {

@@ -22,12 +22,14 @@ import (
 
 func TestConfigFlagsAndEdgecases(t *testing.T) {
 	tests := []struct {
-		desc             string
-		json, hcl, flags []string
-		rt               RuntimeConfig
-		warns            []string
-		err              error
-		verr             error
+		desc  string
+		flags []string
+		json  []string
+		hcl   []string
+		rt    RuntimeConfig
+		err   error    // build error
+		verr  error    // validation error
+		warns []string // build and validation warnings
 	}{
 		// ------------------------------------------------------------
 		// cmd line flags
@@ -55,8 +57,8 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		},
 		{
 			desc:  "-bootstrap-expect",
-			flags: []string{`-bootstrap-expect`, `1`},
-			rt:    RuntimeConfig{BootstrapExpect: 1},
+			flags: []string{`-bootstrap-expect`, `3`},
+			rt:    RuntimeConfig{BootstrapExpect: 3},
 		},
 		{
 			desc:  "-client",
