@@ -179,6 +179,17 @@ func (b *Builder) AppendConfig(c Config) error {
 	return nil
 }
 
+func (b *Builder) BuildAndValidate() (RuntimeConfig, error) {
+	rt, err := b.Build()
+	if err != nil {
+		return RuntimeConfig{}, err
+	}
+	if err := b.Validate(rt); err != nil {
+		return RuntimeConfig{}, err
+	}
+	return rt, nil
+}
+
 // Build constructs the runtime configuration from the config fragments
 // and the command line flags. The config fragments are processed in the
 // order they were added with the flags being processed last to give
@@ -186,6 +197,9 @@ func (b *Builder) AppendConfig(c Config) error {
 // warnings can still contain deprecation or format warnigns that should
 // be presented to the user.
 func (b *Builder) Build() (rt RuntimeConfig, err error) {
+	b.err = nil
+	b.Warnings = nil
+
 	// ----------------------------------------------------------------
 	// deprecated flags
 	//
@@ -220,15 +234,13 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	// merge the config files since the flag values for slices are
 	// otherwise appended instead of prepended.
 
-	if b.Default == nil {
-		b.Default = &defaultConfig
-		if b.boolVal(b.Flags.DevMode) {
-			b.Default = &defaultDevConfig
-		}
+	var cfgs []Config
+	if b.Default != nil {
+		cfgs = append(cfgs, *b.Default)
 	}
 
 	flagSlices, flagValues := b.splitSlicesAndValues(b.Flags.Config)
-	cfgs := []Config{*b.Default, flagSlices}
+	cfgs = append(cfgs, flagSlices)
 	cfgs = append(cfgs, b.Configs...)
 	cfgs = append(cfgs, flagValues)
 	c := Merge(cfgs)

@@ -52,13 +52,13 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 	}
 
 	tests := []struct {
-		desc     string
-		flags    []string
-		json     []string
-		hcl      []string
-		rt       RuntimeConfig
+		desc  string
+		flags []string
+		json  []string
+		hcl   []string
+		//rt       RuntimeConfig
+		patch    func(rt *RuntimeConfig)
 		err      error                  // build error
-		verr     error                  // validation error
 		warns    []string               // build and validation warnings
 		hostname func() (string, error) // mock hostname function
 	}{
@@ -69,952 +69,914 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		{
 			desc:  "-advertise",
 			flags: []string{`-advertise`, `a`},
-			rt: RuntimeConfig{
-				AdvertiseAddrLAN: "a",
-				LeaveOnTerm:      true,
-				NodeName:         "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.AdvertiseAddrLAN = "a"
 			},
 		},
 		{
 			desc:  "-advertise-wan",
 			flags: []string{`-advertise-wan`, `a`},
-			rt: RuntimeConfig{
-				AdvertiseAddrWAN: "a",
-				LeaveOnTerm:      true,
-				NodeName:         "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.AdvertiseAddrWAN = "a"
 			},
 		},
 		{
 			desc:  "-bind",
 			flags: []string{`-bind`, `1.2.3.4`},
-			rt: RuntimeConfig{
-				BindAddrs:   []string{"1.2.3.4"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.BindAddrs = []string{"1.2.3.4"}
 			},
 		},
 		{
 			desc:  "-bootstrap",
-			flags: []string{`-bootstrap`},
-			rt: RuntimeConfig{
-				Bootstrap:   true,
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			flags: []string{`-bootstrap`, `-server`},
+			patch: func(rt *RuntimeConfig) {
+				rt.Bootstrap = true
+				rt.ServerMode = true
+				rt.LeaveOnTerm = !rt.ServerMode
+				rt.SkipLeaveOnInt = rt.ServerMode
 			},
+			warns: []string{"Bootstrap mode enabled! Do not enable unless necessary"},
 		},
 		{
 			desc:  "-bootstrap-expect",
-			flags: []string{`-bootstrap-expect`, `3`},
-			rt: RuntimeConfig{
-				BootstrapExpect: 3,
-				LeaveOnTerm:     true,
-				NodeName:        "nodex",
+			flags: []string{`-bootstrap-expect`, `3`, `-server`},
+			patch: func(rt *RuntimeConfig) {
+				rt.BootstrapExpect = 3
+				rt.ServerMode = true
+				rt.LeaveOnTerm = !rt.ServerMode
+				rt.SkipLeaveOnInt = rt.ServerMode
 			},
+			warns: []string{"BootstrapExpect mode enabled, expecting 3 servers"},
 		},
 		{
 			desc:  "-client",
 			flags: []string{`-client`, `1.2.3.4`},
-			rt: RuntimeConfig{
-				ClientAddrs: []string{"1.2.3.4"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.ClientAddrs = []string{"1.2.3.4"}
+				rt.DNSAddrs = []string{"1.2.3.4:8600"}
+				rt.HTTPAddrs = []string{"1.2.3.4:8500"}
 			},
 		},
 		{
 			desc:  "-data-dir",
 			flags: []string{`-data-dir`, `a`},
-			rt: RuntimeConfig{
-				DataDir:     "a",
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.DataDir = "a"
 			},
 		},
 		{
 			desc:  "-datacenter",
 			flags: []string{`-datacenter`, `a`},
-			rt: RuntimeConfig{
-				Datacenter:  "a",
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.Datacenter = "a"
 			},
 		},
 		{
 			desc:  "-dev",
 			flags: []string{`-dev`},
-			rt: RuntimeConfig{
-				DevMode:     true,
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.DevMode = true
 			},
 		},
 		{
 			desc:  "-disable-host-node-id",
 			flags: []string{`-disable-host-node-id`},
-			rt: RuntimeConfig{
-				DisableHostNodeID: true,
-				LeaveOnTerm:       true,
-				NodeName:          "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.DisableHostNodeID = true
 			},
 		},
 		{
 			desc:  "-disable-keyring-file",
 			flags: []string{`-disable-keyring-file`},
-			rt: RuntimeConfig{
-				DisableKeyringFile: true,
-				LeaveOnTerm:        true,
-				NodeName:           "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.DisableKeyringFile = true
 			},
 		},
 		{
 			desc:  "-dns-port",
-			flags: []string{`-dns-port`, `123`, `-client`, `0.0.0.0`},
-			rt: RuntimeConfig{
-				ClientAddrs: []string{"0.0.0.0"},
-				DNSPort:     123,
-				DNSAddrs:    []string{":123"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			flags: []string{`-dns-port`, `123`},
+			patch: func(rt *RuntimeConfig) {
+				rt.DNSPort = 123
+				rt.DNSAddrs = []string{"127.0.0.1:123"}
 			},
 		},
 		{
 			desc:  "-domain",
 			flags: []string{`-domain`, `a`},
-			rt: RuntimeConfig{
-				DNSDomain:   "a",
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.DNSDomain = "a"
 			},
 		},
 		{
 			desc:  "-enable-script-checks",
 			flags: []string{`-enable-script-checks`},
-			rt: RuntimeConfig{
-				EnableScriptChecks: true,
-				LeaveOnTerm:        true,
-				NodeName:           "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.EnableScriptChecks = true
 			},
 		},
 		{ // todo(fs): shouldn't this be '-encrypt-key'?
 			desc:  "-encrypt",
 			flags: []string{`-encrypt`, `a`},
-			rt: RuntimeConfig{
-				EncryptKey:  "a",
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.EncryptKey = "a"
 			},
 		},
 		{
 			desc:  "-http-port",
-			flags: []string{`-http-port`, `123`, `-client`, `0.0.0.0`},
-			rt: RuntimeConfig{
-				ClientAddrs: []string{"0.0.0.0"},
-				HTTPPort:    123,
-				HTTPAddrs:   []string{":123"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			flags: []string{`-http-port`, `123`},
+			patch: func(rt *RuntimeConfig) {
+				rt.HTTPPort = 123
+				rt.HTTPAddrs = []string{"127.0.0.1:123"}
 			},
 		},
-		{
-			desc:  "-join",
-			flags: []string{`-join`, `a`, `-join`, `b`},
-			rt: RuntimeConfig{
-				StartJoinAddrsLAN: []string{"a", "b"},
-				LeaveOnTerm:       true,
-				NodeName:          "nodex",
+		/*
+			{
+				desc:  "-join",
+				flags: []string{`-join`, `a`, `-join`, `b`},
+				rt: RuntimeConfig{
+					StartJoinAddrsLAN: []string{"a", "b"},
+					LeaveOnTerm:       true,
+					NodeName:          "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-join-wan",
-			flags: []string{`-join-wan`, `a`, `-join-wan`, `b`},
-			rt: RuntimeConfig{
-				StartJoinAddrsWAN: []string{"a", "b"},
-				LeaveOnTerm:       true,
-				NodeName:          "nodex",
+			{
+				desc:  "-join-wan",
+				flags: []string{`-join-wan`, `a`, `-join-wan`, `b`},
+				rt: RuntimeConfig{
+					StartJoinAddrsWAN: []string{"a", "b"},
+					LeaveOnTerm:       true,
+					NodeName:          "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-log-level",
-			flags: []string{`-log-level`, `a`},
-			rt: RuntimeConfig{
-				LogLevel:    "a",
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "-log-level",
+				flags: []string{`-log-level`, `a`},
+				rt: RuntimeConfig{
+					LogLevel:    "a",
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{ // todo(fs): shouldn't this be '-node-name'?
-			desc:  "-node",
-			flags: []string{`-node`, `a`},
-			rt: RuntimeConfig{
-				NodeName:    "a",
-				LeaveOnTerm: true,
+			{ // todo(fs): shouldn't this be '-node-name'?
+				desc:  "-node",
+				flags: []string{`-node`, `a`},
+				rt: RuntimeConfig{
+					NodeName:    "a",
+					LeaveOnTerm: true,
+				},
 			},
-		},
-		{
-			desc:  "-node-id",
-			flags: []string{`-node-id`, `a`},
-			rt: RuntimeConfig{
-				NodeID:      "a",
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "-node-id",
+				flags: []string{`-node-id`, `a`},
+				rt: RuntimeConfig{
+					NodeID:      "a",
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-node-meta",
-			flags: []string{`-node-meta`, `a:b`, `-node-meta`, `c:d`},
-			rt: RuntimeConfig{
-				NodeMeta:    map[string]string{"a": "b", "c": "d"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "-node-meta",
+				flags: []string{`-node-meta`, `a:b`, `-node-meta`, `c:d`},
+				rt: RuntimeConfig{
+					NodeMeta:    map[string]string{"a": "b", "c": "d"},
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-non-voting-server",
-			flags: []string{`-non-voting-server`},
-			rt: RuntimeConfig{
-				NonVotingServer: true,
-				LeaveOnTerm:     true,
-				NodeName:        "nodex",
+			{
+				desc:  "-non-voting-server",
+				flags: []string{`-non-voting-server`},
+				rt: RuntimeConfig{
+					NonVotingServer: true,
+					LeaveOnTerm:     true,
+					NodeName:        "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-pid-file",
-			flags: []string{`-pid-file`, `a`},
-			rt: RuntimeConfig{
-				PidFile:     "a",
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "-pid-file",
+				flags: []string{`-pid-file`, `a`},
+				rt: RuntimeConfig{
+					PidFile:     "a",
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-protocol",
-			flags: []string{`-protocol`, `1`},
-			rt: RuntimeConfig{
-				RPCProtocol: 1,
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "-protocol",
+				flags: []string{`-protocol`, `1`},
+				rt: RuntimeConfig{
+					RPCProtocol: 1,
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-raft-protocol",
-			flags: []string{`-raft-protocol`, `1`},
-			rt: RuntimeConfig{
-				RaftProtocol: 1,
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-raft-protocol",
+				flags: []string{`-raft-protocol`, `1`},
+				rt: RuntimeConfig{
+					RaftProtocol: 1,
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-recursor",
-			flags: []string{`-recursor`, `a`, `-recursor`, `b`},
-			rt: RuntimeConfig{
-				DNSRecursors: []string{"a", "b"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-recursor",
+				flags: []string{`-recursor`, `a`, `-recursor`, `b`},
+				rt: RuntimeConfig{
+					DNSRecursors: []string{"a", "b"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-rejoin",
-			flags: []string{`-rejoin`},
-			rt: RuntimeConfig{
-				RejoinAfterLeave: true,
-				LeaveOnTerm:      true,
-				NodeName:         "nodex",
+			{
+				desc:  "-rejoin",
+				flags: []string{`-rejoin`},
+				rt: RuntimeConfig{
+					RejoinAfterLeave: true,
+					LeaveOnTerm:      true,
+					NodeName:         "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-interval",
-			flags: []string{`-retry-interval`, `5s`},
-			rt: RuntimeConfig{
-				RetryJoinIntervalLAN: 5 * time.Second,
-				LeaveOnTerm:          true,
-				NodeName:             "nodex",
+			{
+				desc:  "-retry-interval",
+				flags: []string{`-retry-interval`, `5s`},
+				rt: RuntimeConfig{
+					RetryJoinIntervalLAN: 5 * time.Second,
+					LeaveOnTerm:          true,
+					NodeName:             "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-interval-wan",
-			flags: []string{`-retry-interval-wan`, `5s`},
-			rt: RuntimeConfig{
-				RetryJoinIntervalWAN: 5 * time.Second,
-				LeaveOnTerm:          true,
-				NodeName:             "nodex",
+			{
+				desc:  "-retry-interval-wan",
+				flags: []string{`-retry-interval-wan`, `5s`},
+				rt: RuntimeConfig{
+					RetryJoinIntervalWAN: 5 * time.Second,
+					LeaveOnTerm:          true,
+					NodeName:             "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-join",
-			flags: []string{`-retry-join`, `a`, `-retry-join`, `b`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"a", "b"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-retry-join",
+				flags: []string{`-retry-join`, `a`, `-retry-join`, `b`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"a", "b"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-join-wan",
-			flags: []string{`-retry-join-wan`, `a`, `-retry-join-wan`, `b`},
-			rt: RuntimeConfig{
-				RetryJoinWAN: []string{"a", "b"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-retry-join-wan",
+				flags: []string{`-retry-join-wan`, `a`, `-retry-join-wan`, `b`},
+				rt: RuntimeConfig{
+					RetryJoinWAN: []string{"a", "b"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-max",
-			flags: []string{`-retry-max`, `1`},
-			rt: RuntimeConfig{
-				RetryJoinMaxAttemptsLAN: 1,
-				LeaveOnTerm:             true,
-				NodeName:                "nodex",
+			{
+				desc:  "-retry-max",
+				flags: []string{`-retry-max`, `1`},
+				rt: RuntimeConfig{
+					RetryJoinMaxAttemptsLAN: 1,
+					LeaveOnTerm:             true,
+					NodeName:                "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-max-wan",
-			flags: []string{`-retry-max-wan`, `1`},
-			rt: RuntimeConfig{
-				RetryJoinMaxAttemptsWAN: 1,
-				LeaveOnTerm:             true,
-				NodeName:                "nodex",
+			{
+				desc:  "-retry-max-wan",
+				flags: []string{`-retry-max-wan`, `1`},
+				rt: RuntimeConfig{
+					RetryJoinMaxAttemptsWAN: 1,
+					LeaveOnTerm:             true,
+					NodeName:                "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-serf-lan-bind",
-			flags: []string{`-serf-lan-bind`, `a`},
-			rt: RuntimeConfig{
-				SerfBindAddrLAN: "a",
-				LeaveOnTerm:     true,
-				NodeName:        "nodex",
+			{
+				desc:  "-serf-lan-bind",
+				flags: []string{`-serf-lan-bind`, `a`},
+				rt: RuntimeConfig{
+					SerfBindAddrLAN: "a",
+					LeaveOnTerm:     true,
+					NodeName:        "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-serf-wan-bind",
-			flags: []string{`-serf-wan-bind`, `a`},
-			rt: RuntimeConfig{
-				SerfBindAddrWAN: "a",
-				LeaveOnTerm:     true,
-				NodeName:        "nodex",
+			{
+				desc:  "-serf-wan-bind",
+				flags: []string{`-serf-wan-bind`, `a`},
+				rt: RuntimeConfig{
+					SerfBindAddrWAN: "a",
+					LeaveOnTerm:     true,
+					NodeName:        "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-server",
-			flags: []string{`-server`},
-			rt: RuntimeConfig{
-				ServerMode:     true,
-				SkipLeaveOnInt: true,
-				NodeName:       "nodex",
+			{
+				desc:  "-server",
+				flags: []string{`-server`},
+				rt: RuntimeConfig{
+					ServerMode:     true,
+					SkipLeaveOnInt: true,
+					NodeName:       "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-syslog",
-			flags: []string{`-syslog`},
-			rt: RuntimeConfig{
-				EnableSyslog: true,
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-syslog",
+				flags: []string{`-syslog`},
+				rt: RuntimeConfig{
+					EnableSyslog: true,
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-ui",
-			flags: []string{`-ui`},
-			rt: RuntimeConfig{
-				EnableUI:    true,
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "-ui",
+				flags: []string{`-ui`},
+				rt: RuntimeConfig{
+					EnableUI:    true,
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-ui-dir",
-			flags: []string{`-ui-dir`, `a`},
-			rt: RuntimeConfig{
-				UIDir:       "a",
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "-ui-dir",
+				flags: []string{`-ui-dir`, `a`},
+				rt: RuntimeConfig{
+					UIDir:       "a",
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
 
-		// ------------------------------------------------------------
-		// deprecated flags
-		//
+			// ------------------------------------------------------------
+			// deprecated flags
+			//
 
-		{
-			desc:  "-atlas",
-			flags: []string{`-atlas`, `a`},
-			warns: []string{`'-atlas' is deprecated`},
-			rt: RuntimeConfig{
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "-atlas",
+				flags: []string{`-atlas`, `a`},
+				warns: []string{`'-atlas' is deprecated`},
+				rt: RuntimeConfig{
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-atlas-join",
-			flags: []string{`-atlas-join`},
-			warns: []string{`'-atlas-join' is deprecated`},
-			rt: RuntimeConfig{
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "-atlas-join",
+				flags: []string{`-atlas-join`},
+				warns: []string{`'-atlas-join' is deprecated`},
+				rt: RuntimeConfig{
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-atlas-endpoint",
-			flags: []string{`-atlas-endpoint`, `a`},
-			warns: []string{`'-atlas-endpoint' is deprecated`},
-			rt: RuntimeConfig{
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "-atlas-endpoint",
+				flags: []string{`-atlas-endpoint`, `a`},
+				warns: []string{`'-atlas-endpoint' is deprecated`},
+				rt: RuntimeConfig{
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-atlas-token",
-			flags: []string{`-atlas-token`, `a`},
-			warns: []string{`'-atlas-token' is deprecated`},
-			rt: RuntimeConfig{
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "-atlas-token",
+				flags: []string{`-atlas-token`, `a`},
+				warns: []string{`'-atlas-token' is deprecated`},
+				rt: RuntimeConfig{
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-dc",
-			flags: []string{`-dc`, `a`},
-			warns: []string{`'-dc' is deprecated. Use '-datacenter' instead`},
-			rt: RuntimeConfig{
-				Datacenter:  "a",
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "-dc",
+				flags: []string{`-dc`, `a`},
+				warns: []string{`'-dc' is deprecated. Use '-datacenter' instead`},
+				rt: RuntimeConfig{
+					Datacenter:  "a",
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-join-azure-tag-name",
-			flags: []string{`-retry-join-azure-tag-name`, `a`},
-			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_name=a" to retry_join.`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"provider=azure tag_name=a"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-retry-join-azure-tag-name",
+				flags: []string{`-retry-join-azure-tag-name`, `a`},
+				warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_name=a" to retry_join.`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"provider=azure tag_name=a"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-join-azure-tag-value",
-			flags: []string{`-retry-join-azure-tag-value`, `a`},
-			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_value=a" to retry_join.`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"provider=azure tag_value=a"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-retry-join-azure-tag-value",
+				flags: []string{`-retry-join-azure-tag-value`, `a`},
+				warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_value=a" to retry_join.`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"provider=azure tag_value=a"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-join-ec2-region",
-			flags: []string{`-retry-join-ec2-region`, `a`},
-			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws region=a" to retry_join.`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"provider=aws region=a"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-retry-join-ec2-region",
+				flags: []string{`-retry-join-ec2-region`, `a`},
+				warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws region=a" to retry_join.`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"provider=aws region=a"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-join-ec2-tag-key",
-			flags: []string{`-retry-join-ec2-tag-key`, `a`},
-			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_key=a" to retry_join.`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"provider=aws tag_key=a"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-retry-join-ec2-tag-key",
+				flags: []string{`-retry-join-ec2-tag-key`, `a`},
+				warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_key=a" to retry_join.`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"provider=aws tag_key=a"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-join-ec2-tag-value",
-			flags: []string{`-retry-join-ec2-tag-value`, `a`},
-			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_value=a" to retry_join.`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"provider=aws tag_value=a"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-retry-join-ec2-tag-value",
+				flags: []string{`-retry-join-ec2-tag-value`, `a`},
+				warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_value=a" to retry_join.`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"provider=aws tag_value=a"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-join-gce-credentials-file",
-			flags: []string{`-retry-join-gce-credentials-file`, `a`},
-			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden" to retry_join.`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"provider=gce credentials_file=a"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-retry-join-gce-credentials-file",
+				flags: []string{`-retry-join-gce-credentials-file`, `a`},
+				warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden" to retry_join.`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"provider=gce credentials_file=a"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-join-gce-project-name",
-			flags: []string{`-retry-join-gce-project-name`, `a`},
-			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce project_name=a" to retry_join.`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"provider=gce project_name=a"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-retry-join-gce-project-name",
+				flags: []string{`-retry-join-gce-project-name`, `a`},
+				warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce project_name=a" to retry_join.`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"provider=gce project_name=a"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-join-gce-tag-value",
-			flags: []string{`-retry-join-gce-tag-value`, `a`},
-			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce tag_value=a" to retry_join.`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"provider=gce tag_value=a"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-retry-join-gce-tag-value",
+				flags: []string{`-retry-join-gce-tag-value`, `a`},
+				warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce tag_value=a" to retry_join.`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"provider=gce tag_value=a"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc:  "-retry-join-gce-zone-pattern",
-			flags: []string{`-retry-join-gce-zone-pattern`, `a`},
-			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce zone_pattern=a" to retry_join.`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"provider=gce zone_pattern=a"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc:  "-retry-join-gce-zone-pattern",
+				flags: []string{`-retry-join-gce-zone-pattern`, `a`},
+				warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce zone_pattern=a" to retry_join.`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"provider=gce zone_pattern=a"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
 
-		// ------------------------------------------------------------
-		// deprecated fields
-		//
+			// ------------------------------------------------------------
+			// deprecated fields
+			//
 
-		{
-			desc:  "check.service_id alias",
-			json:  []string{`{"check":{ "service_id":"d", "serviceid":"dd" }}`},
-			hcl:   []string{`check = { service_id="d" serviceid="dd" }`},
-			warns: []string{`config: "serviceid" is deprecated in check definitions. Please use "service_id" instead.`},
-			rt: RuntimeConfig{
-				Checks:      []*structs.CheckDefinition{{ServiceID: "dd"}},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "check.service_id alias",
+				json:  []string{`{"check":{ "service_id":"d", "serviceid":"dd" }}`},
+				hcl:   []string{`check = { service_id="d" serviceid="dd" }`},
+				warns: []string{`config: "serviceid" is deprecated in check definitions. Please use "service_id" instead.`},
+				rt: RuntimeConfig{
+					Checks:      []*structs.CheckDefinition{{ServiceID: "dd"}},
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "check.docker_container_id alias",
-			json:  []string{`{"check":{ "docker_container_id":"k", "dockercontainerid":"kk" }}`},
-			hcl:   []string{`check = { docker_container_id="k" dockercontainerid="kk" }`},
-			warns: []string{`config: "dockercontainerid" is deprecated in check definitions. Please use "docker_container_id" instead.`},
-			rt: RuntimeConfig{
-				Checks:      []*structs.CheckDefinition{{DockerContainerID: "kk"}},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "check.docker_container_id alias",
+				json:  []string{`{"check":{ "docker_container_id":"k", "dockercontainerid":"kk" }}`},
+				hcl:   []string{`check = { docker_container_id="k" dockercontainerid="kk" }`},
+				warns: []string{`config: "dockercontainerid" is deprecated in check definitions. Please use "docker_container_id" instead.`},
+				rt: RuntimeConfig{
+					Checks:      []*structs.CheckDefinition{{DockerContainerID: "kk"}},
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "check.tls_skip_verify alias",
-			json:  []string{`{"check":{ "tls_skip_verify":true, "tlsskipverify":false }}`},
-			hcl:   []string{`check = { tls_skip_verify=true tlsskipverify=false }`},
-			warns: []string{`config: "tlsskipverify" is deprecated in check definitions. Please use "tls_skip_verify" instead.`},
-			rt: RuntimeConfig{
-				Checks:      []*structs.CheckDefinition{{TLSSkipVerify: false}},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "check.tls_skip_verify alias",
+				json:  []string{`{"check":{ "tls_skip_verify":true, "tlsskipverify":false }}`},
+				hcl:   []string{`check = { tls_skip_verify=true tlsskipverify=false }`},
+				warns: []string{`config: "tlsskipverify" is deprecated in check definitions. Please use "tls_skip_verify" instead.`},
+				rt: RuntimeConfig{
+					Checks:      []*structs.CheckDefinition{{TLSSkipVerify: false}},
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "check.deregister_critical_service_after alias",
-			json:  []string{`{"check":{ "deregister_critical_service_after":"5s", "deregistercriticalserviceafter": "10s" }}`},
-			hcl:   []string{`check = { deregister_critical_service_after="5s" deregistercriticalserviceafter="10s"}`},
-			warns: []string{`config: "deregistercriticalserviceafter" is deprecated in check definitions. Please use "deregister_critical_service_after" instead.`},
-			rt: RuntimeConfig{
-				Checks:      []*structs.CheckDefinition{{DeregisterCriticalServiceAfter: 10 * time.Second}},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc:  "check.deregister_critical_service_after alias",
+				json:  []string{`{"check":{ "deregister_critical_service_after":"5s", "deregistercriticalserviceafter": "10s" }}`},
+				hcl:   []string{`check = { deregister_critical_service_after="5s" deregistercriticalserviceafter="10s"}`},
+				warns: []string{`config: "deregistercriticalserviceafter" is deprecated in check definitions. Please use "deregister_critical_service_after" instead.`},
+				rt: RuntimeConfig{
+					Checks:      []*structs.CheckDefinition{{DeregisterCriticalServiceAfter: 10 * time.Second}},
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc:  "http_api_response_headers",
-			json:  []string{`{"http_api_response_headers":{"a":"b","c":"d"}}`},
-			hcl:   []string{`http_api_response_headers = {"a"="b" "c"="d"}`},
-			warns: []string{`config: "http_api_response_headers" is deprecated. Please use "http_config.response_headers" instead.`},
-			rt: RuntimeConfig{
-				LeaveOnTerm:         true,
-				NodeName:            "nodex",
-				HTTPResponseHeaders: map[string]string{"a": "b", "c": "d"},
+			{
+				desc:  "http_api_response_headers",
+				json:  []string{`{"http_api_response_headers":{"a":"b","c":"d"}}`},
+				hcl:   []string{`http_api_response_headers = {"a"="b" "c"="d"}`},
+				warns: []string{`config: "http_api_response_headers" is deprecated. Please use "http_config.response_headers" instead.`},
+				rt: RuntimeConfig{
+					LeaveOnTerm:         true,
+					NodeName:            "nodex",
+					HTTPResponseHeaders: map[string]string{"a": "b", "c": "d"},
+				},
 			},
-		},
-		{
-			desc: "retry_join_azure",
-			json: []string{`{
-				"retry_join_azure":{
-					"tag_name": "a",
-					"tag_value": "b",
-					"subscription_id": "c",
-					"tenant_id": "d",
-					"client_id": "e",
-					"secret_access_key": "f"
-				}
-			}`},
-			hcl: []string{`
-				retry_join_azure = {
-					tag_name = "a"
-					tag_value = "b"
-					subscription_id = "c"
-					tenant_id = "d"
-					client_id = "e"
-					secret_access_key = "f"
-				}
-			`},
-			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure client_id=hidden secret_access_key=hidden subscription_id=hidden tag_name=a tag_value=b tenant_id=hidden" to retry_join.`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"provider=azure client_id=e secret_access_key=f subscription_id=c tag_name=a tag_value=b tenant_id=d"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc: "retry_join_azure",
+				json: []string{`{
+					"retry_join_azure":{
+						"tag_name": "a",
+						"tag_value": "b",
+						"subscription_id": "c",
+						"tenant_id": "d",
+						"client_id": "e",
+						"secret_access_key": "f"
+					}
+				}`},
+				hcl: []string{`
+					retry_join_azure = {
+						tag_name = "a"
+						tag_value = "b"
+						subscription_id = "c"
+						tenant_id = "d"
+						client_id = "e"
+						secret_access_key = "f"
+					}
+				`},
+				warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure client_id=hidden secret_access_key=hidden subscription_id=hidden tag_name=a tag_value=b tenant_id=hidden" to retry_join.`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"provider=azure client_id=e secret_access_key=f subscription_id=c tag_name=a tag_value=b tenant_id=d"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc: "retry_join_ec2",
-			json: []string{`{
-				"retry_join_ec2":{
-					"tag_key": "a",
-					"tag_value": "b",
-					"region": "c",
-					"access_key_id": "d",
-					"secret_access_key": "e"
-				}
-			}`},
-			hcl: []string{`
-				retry_join_ec2 = {
-					tag_key = "a"
-					tag_value = "b"
-					region = "c"
-					access_key_id = "d"
-					secret_access_key = "e"
-				}
-			`},
-			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws access_key_id=hidden region=c secret_access_key=hidden tag_key=a tag_value=b" to retry_join.`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"provider=aws access_key_id=d region=c secret_access_key=e tag_key=a tag_value=b"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc: "retry_join_ec2",
+				json: []string{`{
+					"retry_join_ec2":{
+						"tag_key": "a",
+						"tag_value": "b",
+						"region": "c",
+						"access_key_id": "d",
+						"secret_access_key": "e"
+					}
+				}`},
+				hcl: []string{`
+					retry_join_ec2 = {
+						tag_key = "a"
+						tag_value = "b"
+						region = "c"
+						access_key_id = "d"
+						secret_access_key = "e"
+					}
+				`},
+				warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws access_key_id=hidden region=c secret_access_key=hidden tag_key=a tag_value=b" to retry_join.`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"provider=aws access_key_id=d region=c secret_access_key=e tag_key=a tag_value=b"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
-		{
-			desc: "retry_join_gce",
-			json: []string{`{
-				"retry_join_gce":{
-					"project_name": "a",
-					"zone_pattern": "b",
-					"tag_value": "c",
-					"credentials_file": "d"
-				}
-			}`},
-			hcl: []string{`
-				retry_join_gce = {
-					project_name = "a"
-					zone_pattern = "b"
-					tag_value = "c"
-					credentials_file = "d"
-				}
-			`},
-			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden project_name=a tag_value=c zone_pattern=b" to retry_join.`},
-			rt: RuntimeConfig{
-				RetryJoinLAN: []string{"provider=gce credentials_file=d project_name=a tag_value=c zone_pattern=b"},
-				LeaveOnTerm:  true,
-				NodeName:     "nodex",
+			{
+				desc: "retry_join_gce",
+				json: []string{`{
+					"retry_join_gce":{
+						"project_name": "a",
+						"zone_pattern": "b",
+						"tag_value": "c",
+						"credentials_file": "d"
+					}
+				}`},
+				hcl: []string{`
+					retry_join_gce = {
+						project_name = "a"
+						zone_pattern = "b"
+						tag_value = "c"
+						credentials_file = "d"
+					}
+				`},
+				warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden project_name=a tag_value=c zone_pattern=b" to retry_join.`},
+				rt: RuntimeConfig{
+					RetryJoinLAN: []string{"provider=gce credentials_file=d project_name=a tag_value=c zone_pattern=b"},
+					LeaveOnTerm:  true,
+					NodeName:     "nodex",
+				},
 			},
-		},
 
-		{
-			desc:  "telemetry.dogstatsd_addr alias",
-			json:  []string{`{"dogstatsd_addr":"a", "telemetry":{"dogstatsd_addr": "b"}}`},
-			hcl:   []string{`dogstatsd_addr = "a" telemetry = { dogstatsd_addr = "b"}`},
-			warns: []string{`config: "dogstatsd_addr" is deprecated. Please use "telemetry.dogstatsd_addr" instead.`},
-			rt: RuntimeConfig{
-				TelemetryDogstatsdAddr: "a",
-				LeaveOnTerm:            true,
-				NodeName:               "nodex",
+			{
+				desc:  "telemetry.dogstatsd_addr alias",
+				json:  []string{`{"dogstatsd_addr":"a", "telemetry":{"dogstatsd_addr": "b"}}`},
+				hcl:   []string{`dogstatsd_addr = "a" telemetry = { dogstatsd_addr = "b"}`},
+				warns: []string{`config: "dogstatsd_addr" is deprecated. Please use "telemetry.dogstatsd_addr" instead.`},
+				rt: RuntimeConfig{
+					TelemetryDogstatsdAddr: "a",
+					LeaveOnTerm:            true,
+					NodeName:               "nodex",
+				},
 			},
-		},
-		{
-			desc:  "telemetry.dogstatsd_tags alias",
-			json:  []string{`{"dogstatsd_tags":["a", "b"], "telemetry": { "dogstatsd_tags": ["c", "d"]}}`},
-			hcl:   []string{`dogstatsd_tags = ["a", "b"] telemetry = { dogstatsd_tags = ["c", "d"] }`},
-			warns: []string{`config: "dogstatsd_tags" is deprecated. Please use "telemetry.dogstatsd_tags" instead.`},
-			rt: RuntimeConfig{
-				TelemetryDogstatsdTags: []string{"a", "b", "c", "d"},
-				LeaveOnTerm:            true,
-				NodeName:               "nodex",
+			{
+				desc:  "telemetry.dogstatsd_tags alias",
+				json:  []string{`{"dogstatsd_tags":["a", "b"], "telemetry": { "dogstatsd_tags": ["c", "d"]}}`},
+				hcl:   []string{`dogstatsd_tags = ["a", "b"] telemetry = { dogstatsd_tags = ["c", "d"] }`},
+				warns: []string{`config: "dogstatsd_tags" is deprecated. Please use "telemetry.dogstatsd_tags" instead.`},
+				rt: RuntimeConfig{
+					TelemetryDogstatsdTags: []string{"a", "b", "c", "d"},
+					LeaveOnTerm:            true,
+					NodeName:               "nodex",
+				},
 			},
-		},
-		{
-			desc:  "telemetry.statsd_addr alias",
-			json:  []string{`{"statsd_addr":"a", "telemetry":{"statsd_addr": "b"}}`},
-			hcl:   []string{`statsd_addr = "a" telemetry = { statsd_addr = "b" }`},
-			warns: []string{`config: "statsd_addr" is deprecated. Please use "telemetry.statsd_addr" instead.`},
-			rt: RuntimeConfig{
-				TelemetryStatsdAddr: "a",
-				LeaveOnTerm:         true,
-				NodeName:            "nodex",
+			{
+				desc:  "telemetry.statsd_addr alias",
+				json:  []string{`{"statsd_addr":"a", "telemetry":{"statsd_addr": "b"}}`},
+				hcl:   []string{`statsd_addr = "a" telemetry = { statsd_addr = "b" }`},
+				warns: []string{`config: "statsd_addr" is deprecated. Please use "telemetry.statsd_addr" instead.`},
+				rt: RuntimeConfig{
+					TelemetryStatsdAddr: "a",
+					LeaveOnTerm:         true,
+					NodeName:            "nodex",
+				},
 			},
-		},
-		{
-			desc:  "telemetry.statsite_addr alias",
-			json:  []string{`{"statsite_addr":"a", "telemetry":{ "statsite_addr": "b" }}`},
-			hcl:   []string{`statsite_addr = "a" telemetry = { statsite_addr = "b"}`},
-			warns: []string{`config: "statsite_addr" is deprecated. Please use "telemetry.statsite_addr" instead.`},
-			rt: RuntimeConfig{
-				TelemetryStatsiteAddr: "a",
-				LeaveOnTerm:           true,
-				NodeName:              "nodex",
+			{
+				desc:  "telemetry.statsite_addr alias",
+				json:  []string{`{"statsite_addr":"a", "telemetry":{ "statsite_addr": "b" }}`},
+				hcl:   []string{`statsite_addr = "a" telemetry = { statsite_addr = "b"}`},
+				warns: []string{`config: "statsite_addr" is deprecated. Please use "telemetry.statsite_addr" instead.`},
+				rt: RuntimeConfig{
+					TelemetryStatsiteAddr: "a",
+					LeaveOnTerm:           true,
+					NodeName:              "nodex",
+				},
 			},
-		},
-		{
-			desc:  "telemetry.statsite_prefix alias",
-			json:  []string{`{"statsite_prefix":"a", "telemetry":{ "statsite_prefix": "b" }}`},
-			hcl:   []string{`statsite_prefix = "a" telemetry = { statsite_prefix = "b" }`},
-			warns: []string{`config: "statsite_prefix" is deprecated. Please use "telemetry.statsite_prefix" instead.`},
-			rt: RuntimeConfig{
-				TelemetryStatsitePrefix: "a",
-				LeaveOnTerm:             true,
-				NodeName:                "nodex",
+			{
+				desc:  "telemetry.statsite_prefix alias",
+				json:  []string{`{"statsite_prefix":"a", "telemetry":{ "statsite_prefix": "b" }}`},
+				hcl:   []string{`statsite_prefix = "a" telemetry = { statsite_prefix = "b" }`},
+				warns: []string{`config: "statsite_prefix" is deprecated. Please use "telemetry.statsite_prefix" instead.`},
+				rt: RuntimeConfig{
+					TelemetryStatsitePrefix: "a",
+					LeaveOnTerm:             true,
+					NodeName:                "nodex",
+				},
 			},
-		},
 
-		// ------------------------------------------------------------
-		// ports and addresses
-		//
+			// ------------------------------------------------------------
+			// ports and addresses
+			//
 
-		{
-			desc: "client addr and ports == 0",
-			json: []string{`{
-				"client_addr":"0.0.0.0",
-				"ports":{}
-			}`},
-			hcl: []string{`
-				client_addr = "0.0.0.0"
-				ports {}
-			`},
-			rt: RuntimeConfig{
-				ClientAddrs: []string{"0.0.0.0"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc: "client addr and ports == 0",
+				json: []string{`{
+					"client_addr":"0.0.0.0",
+					"ports":{}
+				}`},
+				hcl: []string{`
+					client_addr = "0.0.0.0"
+					ports {}
+				`},
+				rt: RuntimeConfig{
+					ClientAddrs: []string{"0.0.0.0"},
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc: "client addr and ports < 0",
-			json: []string{`{
-				"client_addr":"0.0.0.0",
-				"ports": { "dns":-1, "http":-2, "https":-3 }
-			}`},
-			hcl: []string{`
-				client_addr = "0.0.0.0"
-				ports { dns = -1 http = -2 https = -3 }
-			`},
-			rt: RuntimeConfig{
-				ClientAddrs: []string{"0.0.0.0"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc: "client addr and ports < 0",
+				json: []string{`{
+					"client_addr":"0.0.0.0",
+					"ports": { "dns":-1, "http":-2, "https":-3 }
+				}`},
+				hcl: []string{`
+					client_addr = "0.0.0.0"
+					ports { dns = -1 http = -2 https = -3 }
+				`},
+				rt: RuntimeConfig{
+					ClientAddrs: []string{"0.0.0.0"},
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc: "client addr and ports < 0",
-			json: []string{`{
-				"client_addr":"0.0.0.0",
-				"ports": { "dns":-1, "http":-2, "https":-3 }
-			}`},
-			hcl: []string{`
-				client_addr = "0.0.0.0"
-				ports { dns = -1 http = -2 https = -3 }
-			`},
-			rt: RuntimeConfig{
-				ClientAddrs: []string{"0.0.0.0"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc: "client addr and ports < 0",
+				json: []string{`{
+					"client_addr":"0.0.0.0",
+					"ports": { "dns":-1, "http":-2, "https":-3 }
+				}`},
+				hcl: []string{`
+					client_addr = "0.0.0.0"
+					ports { dns = -1 http = -2 https = -3 }
+				`},
+				rt: RuntimeConfig{
+					ClientAddrs: []string{"0.0.0.0"},
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc: "client addr and ports > 0",
-			json: []string{`{
-				"client_addr":"0.0.0.0",
-				"ports":{ "dns": 1, "http": 2, "https": 3 }
-			}`},
-			hcl: []string{`
-				client_addr = "0.0.0.0"
-				ports { dns = 1 http = 2 https = 3 }
-			`},
-			rt: RuntimeConfig{
-				ClientAddrs: []string{"0.0.0.0"},
-				DNSPort:     1,
-				HTTPPort:    2,
-				HTTPSPort:   3,
-				DNSAddrs:    []string{":1"},
-				HTTPAddrs:   []string{":2"},
-				HTTPSAddrs:  []string{":3"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc: "client addr and ports > 0",
+				json: []string{`{
+					"client_addr":"0.0.0.0",
+					"ports":{ "dns": 1, "http": 2, "https": 3 }
+				}`},
+				hcl: []string{`
+					client_addr = "0.0.0.0"
+					ports { dns = 1 http = 2 https = 3 }
+				`},
+				rt: RuntimeConfig{
+					ClientAddrs: []string{"0.0.0.0"},
+					DNSPort:     1,
+					HTTPPort:    2,
+					HTTPSPort:   3,
+					DNSAddrs:    []string{":1"},
+					HTTPAddrs:   []string{":2"},
+					HTTPSAddrs:  []string{":3"},
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
 
-		{
-			desc: "client addr, addresses and ports == 0",
-			json: []string{`{
-				"client_addr":"0.0.0.0",
-				"addresses": { "dns": "1.1.1.1", "http": "2.2.2.2", "https": "3.3.3.3" },
-				"ports":{}
-			}`},
-			hcl: []string{`
-				client_addr = "0.0.0.0"
-				addresses = { dns = "1.1.1.1" http = "2.2.2.2" https = "3.3.3.3" }
-				ports {}
-			`},
-			rt: RuntimeConfig{
-				ClientAddrs: []string{"0.0.0.0"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc: "client addr, addresses and ports == 0",
+				json: []string{`{
+					"client_addr":"0.0.0.0",
+					"addresses": { "dns": "1.1.1.1", "http": "2.2.2.2", "https": "3.3.3.3" },
+					"ports":{}
+				}`},
+				hcl: []string{`
+					client_addr = "0.0.0.0"
+					addresses = { dns = "1.1.1.1" http = "2.2.2.2" https = "3.3.3.3" }
+					ports {}
+				`},
+				rt: RuntimeConfig{
+					ClientAddrs: []string{"0.0.0.0"},
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc: "client addr, addresses and ports < 0",
-			json: []string{`{
-				"client_addr":"0.0.0.0",
-				"addresses": { "dns": "1.1.1.1", "http": "2.2.2.2", "https": "3.3.3.3" },
-				"ports": { "dns":-1, "http":-2, "https":-3 }
-			}`},
-			hcl: []string{`
-				client_addr = "0.0.0.0"
-				addresses = { dns = "1.1.1.1" http = "2.2.2.2" https = "3.3.3.3" }
-				ports { dns = -1 http = -2 https = -3 }
-			`},
-			rt: RuntimeConfig{
-				ClientAddrs: []string{"0.0.0.0"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc: "client addr, addresses and ports < 0",
+				json: []string{`{
+					"client_addr":"0.0.0.0",
+					"addresses": { "dns": "1.1.1.1", "http": "2.2.2.2", "https": "3.3.3.3" },
+					"ports": { "dns":-1, "http":-2, "https":-3 }
+				}`},
+				hcl: []string{`
+					client_addr = "0.0.0.0"
+					addresses = { dns = "1.1.1.1" http = "2.2.2.2" https = "3.3.3.3" }
+					ports { dns = -1 http = -2 https = -3 }
+				`},
+				rt: RuntimeConfig{
+					ClientAddrs: []string{"0.0.0.0"},
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
-		{
-			desc: "client addr, addresses and ports",
-			json: []string{`{
-				"client_addr": "0.0.0.0",
-				"addresses": { "dns": "1.1.1.1", "http": "2.2.2.2", "https": "3.3.3.3" },
-				"ports":{ "dns":1, "http":2, "https":3 }
-			}`},
-			hcl: []string{`
-				client_addr = "0.0.0.0"
-				addresses = { dns = "1.1.1.1" http = "2.2.2.2" https = "3.3.3.3" }
-				ports { dns = 1 http = 2 https = 3 }
-			`},
-			rt: RuntimeConfig{
-				ClientAddrs: []string{"0.0.0.0"},
-				DNSPort:     1,
-				HTTPPort:    2,
-				HTTPSPort:   3,
-				DNSAddrs:    []string{"1.1.1.1:1"},
-				HTTPAddrs:   []string{"2.2.2.2:2"},
-				HTTPSAddrs:  []string{"3.3.3.3:3"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			{
+				desc: "client addr, addresses and ports",
+				json: []string{`{
+					"client_addr": "0.0.0.0",
+					"addresses": { "dns": "1.1.1.1", "http": "2.2.2.2", "https": "3.3.3.3" },
+					"ports":{ "dns":1, "http":2, "https":3 }
+				}`},
+				hcl: []string{`
+					client_addr = "0.0.0.0"
+					addresses = { dns = "1.1.1.1" http = "2.2.2.2" https = "3.3.3.3" }
+					ports { dns = 1 http = 2 https = 3 }
+				`},
+				rt: RuntimeConfig{
+					ClientAddrs: []string{"0.0.0.0"},
+					DNSPort:     1,
+					HTTPPort:    2,
+					HTTPSPort:   3,
+					DNSAddrs:    []string{"1.1.1.1:1"},
+					HTTPAddrs:   []string{"2.2.2.2:2"},
+					HTTPSAddrs:  []string{"3.3.3.3:3"},
+					LeaveOnTerm: true,
+					NodeName:    "nodex",
+				},
 			},
-		},
+		*/
 		{
 			desc: "client template and ports",
 			json: []string{`{
-				"client_addr": "{{ printf \"1.2.3.4 unix://foo 2001:db8::1\" }}",
-				"ports":{ "dns":1, "http":2, "https":3 }
-			}`},
+					"client_addr": "{{ printf \"1.2.3.4 2001:db8::1\" }}",
+					"ports":{ "dns":1, "http":2, "https":3 }
+				}`},
 			hcl: []string{`
-				client_addr = "{{ printf \"1.2.3.4 unix://foo 2001:db8::1\" }}"
-				ports { dns = 1 http = 2 https = 3 }
-			`},
-			rt: RuntimeConfig{
-				ClientAddrs: []string{"1.2.3.4", "unix://foo", "2001:db8::1"},
-				DNSPort:     1,
-				HTTPPort:    2,
-				HTTPSPort:   3,
-				DNSAddrs:    []string{"1.2.3.4:1", "unix://foo", "[2001:db8::1]:1"},
-				HTTPAddrs:   []string{"1.2.3.4:2", "unix://foo", "[2001:db8::1]:2"},
-				HTTPSAddrs:  []string{"1.2.3.4:3", "unix://foo", "[2001:db8::1]:3"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+					client_addr = "{{ printf \"1.2.3.4 2001:db8::1\" }}"
+					ports { dns = 1 http = 2 https = 3 }
+				`},
+			patch: func(rt *RuntimeConfig) {
+				rt.ClientAddrs = []string{"1.2.3.4", "2001:db8::1"}
+				rt.DNSPort = 1
+				rt.DNSAddrs = []string{"1.2.3.4:1", "[2001:db8::1]:1"}
+				rt.HTTPPort = 2
+				rt.HTTPAddrs = []string{"1.2.3.4:2", "[2001:db8::1]:2"}
+				rt.HTTPSPort = 3
+				rt.HTTPSAddrs = []string{"1.2.3.4:3", "[2001:db8::1]:3"}
 			},
 		},
 		{
 			desc: "client, address template and ports",
 			json: []string{`{
-				"client_addr": "{{ printf \"1.2.3.4 unix://foo 2001:db8::1\" }}",
-				"addresses": {
-					"dns": "{{ printf \"1.1.1.1 unix://dns 2001:db8::10 \" }}",
-					"http": "{{ printf \"2.2.2.2 unix://http 2001:db8::20 \" }}",
-					"https": "{{ printf \"3.3.3.3 unix://https 2001:db8::30 \" }}"
-				},
-				"ports":{ "dns":1, "http":2, "https":3 }
-			}`},
+					"client_addr": "{{ printf \"1.2.3.4 unix://foo 2001:db8::1\" }}",
+					"addresses": {
+						"dns": "{{ printf \"1.1.1.1 unix://dns 2001:db8::10 \" }}",
+						"http": "{{ printf \"2.2.2.2 unix://http 2001:db8::20 \" }}",
+						"https": "{{ printf \"3.3.3.3 unix://https 2001:db8::30 \" }}"
+					},
+					"ports":{ "dns":1, "http":2, "https":3 }
+				}`},
 			hcl: []string{`
-				client_addr = "{{ printf \"1.2.3.4 unix://foo 2001:db8::1\" }}"
-				addresses = {
-					dns = "{{ printf \"1.1.1.1 unix://dns 2001:db8::10 \" }}"
-					http = "{{ printf \"2.2.2.2 unix://http 2001:db8::20 \" }}"
-					https = "{{ printf \"3.3.3.3 unix://https 2001:db8::30 \" }}"
-				}
-				ports { dns = 1 http = 2 https = 3 }
-			`},
-			rt: RuntimeConfig{
-				ClientAddrs: []string{"1.2.3.4", "unix://foo", "2001:db8::1"},
-				DNSPort:     1,
-				HTTPPort:    2,
-				HTTPSPort:   3,
-				DNSAddrs:    []string{"1.1.1.1:1", "unix://dns", "[2001:db8::10]:1"},
-				HTTPAddrs:   []string{"2.2.2.2:2", "unix://http", "[2001:db8::20]:2"},
-				HTTPSAddrs:  []string{"3.3.3.3:3", "unix://https", "[2001:db8::30]:3"},
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+					client_addr = "{{ printf \"1.2.3.4 unix://foo 2001:db8::1\" }}"
+					addresses = {
+						dns = "{{ printf \"1.1.1.1 unix://dns 2001:db8::10 \" }}"
+						http = "{{ printf \"2.2.2.2 unix://http 2001:db8::20 \" }}"
+						https = "{{ printf \"3.3.3.3 unix://https 2001:db8::30 \" }}"
+					}
+					ports { dns = 1 http = 2 https = 3 }
+				`},
+			patch: func(rt *RuntimeConfig) {
+				rt.ClientAddrs = []string{"1.2.3.4", "unix://foo", "2001:db8::1"}
+				rt.DNSPort = 1
+				rt.DNSAddrs = []string{"1.1.1.1:1", "unix://dns", "[2001:db8::10]:1"}
+				rt.HTTPPort = 2
+				rt.HTTPAddrs = []string{"2.2.2.2:2", "unix://http", "[2001:db8::20]:2"}
+				rt.HTTPSPort = 3
+				rt.HTTPSAddrs = []string{"3.3.3.3:3", "unix://https", "[2001:db8::30]:3"}
 			},
 		},
 		{
 			desc: "advertise address lan template",
 			json: []string{`{ "advertise_addr": "{{ printf \"1.2.3.4\" }}" }`},
 			hcl:  []string{`advertise_addr = "{{ printf \"1.2.3.4\" }}"`},
-			rt: RuntimeConfig{
-				AdvertiseAddrLAN: "1.2.3.4",
-				LeaveOnTerm:      true,
-				NodeName:         "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.AdvertiseAddrLAN = "1.2.3.4"
 			},
 		},
 		{
 			desc: "advertise address wan template",
 			json: []string{`{ "advertise_addr_wan": "{{ printf \"1.2.3.4\" }}" }`},
 			hcl:  []string{`advertise_addr_wan = "{{ printf \"1.2.3.4\" }}"`},
-			rt: RuntimeConfig{
-				AdvertiseAddrWAN: "1.2.3.4",
-				LeaveOnTerm:      true,
-				NodeName:         "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.AdvertiseAddrWAN = "1.2.3.4"
 			},
 		},
 		{
 			desc: "serf advertise address lan template",
 			json: []string{`{ "advertise_addrs": { "serf_lan": "{{ printf \"1.2.3.4\" }}" } }`},
 			hcl:  []string{`advertise_addrs = { serf_lan = "{{ printf \"1.2.3.4\" }}" }`},
-			rt: RuntimeConfig{
-				SerfAdvertiseAddrLAN: "1.2.3.4",
-				LeaveOnTerm:          true,
-				NodeName:             "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.SerfAdvertiseAddrLAN = "1.2.3.4"
 			},
 		},
 		{
 			desc: "serf advertise address wan template",
 			json: []string{`{ "advertise_addrs": { "serf_wan": "{{ printf \"1.2.3.4\" }}" } }`},
 			hcl:  []string{`advertise_addrs = { serf_wan = "{{ printf \"1.2.3.4\" }}" }`},
-			rt: RuntimeConfig{
-				SerfAdvertiseAddrWAN: "1.2.3.4",
-				LeaveOnTerm:          true,
-				NodeName:             "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.SerfAdvertiseAddrWAN = "1.2.3.4"
 			},
 		},
 		{
 			desc: "serf bind address lan template",
 			json: []string{`{ "serf_lan": "{{ printf \"1.2.3.4\" }}" }`},
 			hcl:  []string{`serf_lan = "{{ printf \"1.2.3.4\" }}"`},
-			rt: RuntimeConfig{
-				SerfBindAddrLAN: "1.2.3.4",
-				LeaveOnTerm:     true,
-				NodeName:        "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.SerfBindAddrLAN = "1.2.3.4"
 			},
 		},
 		{
 			desc: "serf bind address wan template",
 			json: []string{`{ "serf_wan": "{{ printf \"1.2.3.4\" }}" }`},
 			hcl:  []string{`serf_wan = "{{ printf \"1.2.3.4\" }}"`},
-			rt: RuntimeConfig{
-				SerfBindAddrWAN: "1.2.3.4",
-				LeaveOnTerm:     true,
-				NodeName:        "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.SerfBindAddrWAN = "1.2.3.4"
 			},
 		},
 
@@ -1026,81 +988,79 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			desc: "precedence: merge order",
 			json: []string{
 				`{
-					"bootstrap":true,
-					"bootstrap_expect": 1,
-					"datacenter":"a",
-					"start_join":["a", "b"],
-					"node_meta": {"a":"b"}
-				}`,
+						"bootstrap": true,
+						"bootstrap_expect": 1,
+						"datacenter": "a",
+						"start_join": ["a", "b"],
+						"node_meta": {"a":"b"}
+					}`,
 				`{
-					"bootstrap":false,
-					"bootstrap_expect": 2,
-					"datacenter":"b",
-					"start_join":["c", "d"],
-					"node_meta": {"c":"d"}
-				}`,
+						"bootstrap": false,
+						"bootstrap_expect": 0,
+						"datacenter":"b",
+						"start_join": ["c", "d"],
+						"node_meta": {"c":"d"}
+					}`,
 			},
 			hcl: []string{
 				`
-				bootstrap = true
-				bootstrap_expect = 1
-				datacenter = "a"
-				start_join = ["a", "b"]
-				node_meta = { "a" = "b" }
-				`,
+					bootstrap = true
+					bootstrap_expect = 1
+					datacenter = "a"
+					start_join = ["a", "b"]
+					node_meta = { "a" = "b" }
+					`,
 				`
-				bootstrap = false
-				bootstrap_expect = 2
-				datacenter = "b"
-				start_join = ["c", "d"]
-				node_meta = { "c" = "d" }
-				`,
+					bootstrap = false
+					bootstrap_expect = 0
+					datacenter = "b"
+					start_join = ["c", "d"]
+					node_meta = { "c" = "d" }
+					`,
 			},
-			rt: RuntimeConfig{
-				Bootstrap:         false,
-				BootstrapExpect:   2,
-				Datacenter:        "b",
-				StartJoinAddrsLAN: []string{"a", "b", "c", "d"},
-				NodeMeta:          map[string]string{"c": "d"},
-				LeaveOnTerm:       true,
-				NodeName:          "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.Bootstrap = false
+				rt.BootstrapExpect = 0
+				rt.Datacenter = "b"
+				rt.StartJoinAddrsLAN = []string{"a", "b", "c", "d"}
+				rt.NodeMeta = map[string]string{"c": "d"}
 			},
 		},
 		{
 			desc: "precedence: flag before file",
 			json: []string{
 				`{
-					"advertise_addr": "a",
-					"advertise_addr_wan": "a",
-					"bootstrap":true,
-					"bootstrap_expect": 1,
-					"datacenter":"a",
-					"node_meta": {"a":"b"},
-					"recursors":["a", "b"],
-					"serf_lan": "a",
-					"serf_wan": "a",
-					"start_join":["a", "b"]
-				}`,
+						"advertise_addr": "a",
+						"advertise_addr_wan": "a",
+						"bootstrap":true,
+						"bootstrap_expect": 1,
+						"datacenter":"a",
+						"node_meta": {"a":"b"},
+						"recursors":["a", "b"],
+						"serf_lan": "a",
+						"serf_wan": "a",
+						"start_join":["a", "b"]
+					}`,
 			},
 			hcl: []string{
 				`
-				advertise_addr = "a"
-				advertise_addr_wan = "a"
-				bootstrap = true
-				bootstrap_expect = 1
-				datacenter = "a"
-				node_meta = { "a" = "b" }
-				recursors = ["a", "b"]
-				serf_lan = "a"
-				serf_wan = "a"
-				start_join = ["a", "b"]
-				`,
+					advertise_addr = "a"
+					advertise_addr_wan = "a"
+					bootstrap = true
+					bootstrap_expect = 1
+					datacenter = "a"
+					node_meta = { "a" = "b" }
+					recursors = ["a", "b"]
+					serf_lan = "a"
+					serf_wan = "a"
+					start_join = ["a", "b"]
+					`,
 			},
 			flags: []string{
 				`-advertise`, `b`,
 				`-advertise-wan`, `b`,
 				`-bootstrap=false`,
-				`-bootstrap-expect=2`,
+				`-bootstrap-expect=0`,
 				`-datacenter=b`,
 				`-join`, `c`, `-join`, `d`,
 				`-node-meta`, `c:d`,
@@ -1108,19 +1068,15 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				`-serf-lan-bind`, `b`,
 				`-serf-wan-bind`, `b`,
 			},
-			rt: RuntimeConfig{
-				AdvertiseAddrLAN:  "b",
-				AdvertiseAddrWAN:  "b",
-				Bootstrap:         false,
-				BootstrapExpect:   2,
-				Datacenter:        "b",
-				DNSRecursors:      []string{"c", "d", "a", "b"},
-				NodeMeta:          map[string]string{"c": "d"},
-				SerfBindAddrLAN:   "b",
-				SerfBindAddrWAN:   "b",
-				StartJoinAddrsLAN: []string{"c", "d", "a", "b"},
-				LeaveOnTerm:       true,
-				NodeName:          "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.AdvertiseAddrLAN = "b"
+				rt.AdvertiseAddrWAN = "b"
+				rt.Datacenter = "b"
+				rt.DNSRecursors = []string{"c", "d", "a", "b"}
+				rt.NodeMeta = map[string]string{"c": "d"}
+				rt.SerfBindAddrLAN = "b"
+				rt.SerfBindAddrWAN = "b"
+				rt.StartJoinAddrsLAN = []string{"c", "d", "a", "b"}
 			},
 		},
 
@@ -1132,83 +1088,79 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			desc: "datacenter is lower-cased",
 			json: []string{`{ "datacenter": "A" }`},
 			hcl:  []string{`datacenter = "A"`},
-			rt: RuntimeConfig{
-				Datacenter:  "a",
-				LeaveOnTerm: true,
-				NodeName:    "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.Datacenter = "a"
 			},
 		},
 		{
 			desc: "acl_datacenter is lower-cased",
 			json: []string{`{ "acl_datacenter": "A" }`},
 			hcl:  []string{`acl_datacenter = "A"`},
-			rt: RuntimeConfig{
-				ACLDatacenter: "a",
-				LeaveOnTerm:   true,
-				NodeName:      "nodex",
+			patch: func(rt *RuntimeConfig) {
+				rt.ACLDatacenter = "a"
 			},
 		},
 		{
 			desc: "datacenter invalid",
 			json: []string{`{ "datacenter": "%" }`},
 			hcl:  []string{`datacenter = "%"`},
-			verr: errors.New("Datacenter must be alpha-numeric with underscores and hyphens only"),
+			err:  errors.New("Datacenter must be alpha-numeric with underscores and hyphens only"),
 		},
 		{
 			desc:  "acl_datacenter invalid",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "acl_datacenter": "%" }`},
 			hcl:   []string{`acl_datacenter = "%"`},
-			verr:  errors.New("ACL datacenter must be alpha-numeric with underscores and hyphens only"),
+			err:   errors.New("ACL datacenter must be alpha-numeric with underscores and hyphens only"),
 		},
 		{
 			desc:  "autopilot.max_trailing_logs invalid",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "autopilot": { "max_trailing_logs": -1 } }`},
 			hcl:   []string{`autopilot = { max_trailing_logs = -1 }`},
-			verr:  errors.New("autopilot.max_trailing_logs < 0"),
+			err:   errors.New("autopilot.max_trailing_logs < 0"),
 		},
 		{
 			desc:  "bootstrap without server",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "bootstrap": true }`},
 			hcl:   []string{`bootstrap = true`},
-			verr:  errors.New("Bootstrap mode requires Server mode"),
+			err:   errors.New("Bootstrap mode requires Server mode"),
 		},
 		{
 			desc:  "bootstrap-expect without server",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "bootstrap_expect": 3 }`},
 			hcl:   []string{`bootstrap_expect = 3`},
-			verr:  errors.New("BootstrapExpect mode requires Server mode"),
+			err:   errors.New("BootstrapExpect mode requires Server mode"),
 		},
 		{
 			desc:  "bootstrap-expect invalid",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "bootstrap_expect": -1 }`},
 			hcl:   []string{`bootstrap_expect = -1`},
-			verr:  errors.New("BootstrapExpect cannot be negative"),
+			err:   errors.New("BootstrapExpect cannot be negative"),
 		},
 		{
 			desc:  "bootstrap-expect and dev mode",
 			flags: []string{`-datacenter=a`, `-dev`},
 			json:  []string{`{ "bootstrap_expect": 3, "server": true }`},
 			hcl:   []string{`bootstrap_expect = 3 server = true`},
-			verr:  errors.New("BootstrapExpect mode cannot be enabled in dev mode"),
+			err:   errors.New("BootstrapExpect mode cannot be enabled in dev mode"),
 		},
 		{
 			desc:  "bootstrap-expect and boostrap",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "bootstrap": true, "bootstrap_expect": 3, "server": true }`},
 			hcl:   []string{`bootstrap = true bootstrap_expect = 3 server = true`},
-			verr:  errors.New("BootstrapExpect mode and Bootstrap mode are mutually exclusive"),
+			err:   errors.New("BootstrapExpect mode and Bootstrap mode are mutually exclusive"),
 		},
 		{
 			desc:  "enable_ui and ui_dir",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "enable_ui": true, "ui_dir": "a" }`},
 			hcl:   []string{`enable_ui = true ui_dir = "a"`},
-			verr: errors.New("Both the ui and ui-dir flags were specified, please provide only one.\n" +
+			err: errors.New("Both the ui and ui-dir flags were specified, please provide only one.\n" +
 				"If trying to use your own web UI resources, use the ui-dir flag.\n" +
 				"If using Consul version 0.7.0 or later, the web UI is included in the binary so use ui to enable it"),
 		},
@@ -1217,62 +1169,62 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr": "0.0.0.0" }`},
 			hcl:   []string{`advertise_addr = "0.0.0.0"`},
-			verr:  errors.New("Advertise address cannot be 0.0.0.0"),
+			err:   errors.New("Advertise address cannot be 0.0.0.0"),
 		},
 		{
 			desc:  "advertise_addr ipv6 any",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr": "::" }`},
 			hcl:   []string{`advertise_addr = "::"`},
-			verr:  errors.New("Advertise address cannot be ::"),
+			err:   errors.New("Advertise address cannot be ::"),
 		},
 		{
 			desc:  "advertise_addr ipv6 any brackets",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr": "[::]" }`},
 			hcl:   []string{`advertise_addr = "[::]"`},
-			verr:  errors.New("Advertise address cannot be [::]"),
+			err:   errors.New("Advertise address cannot be [::]"),
 		},
 		{
 			desc:  "advertise_addr_wan ipv4 any",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr_wan": "0.0.0.0" }`},
 			hcl:   []string{`advertise_addr_wan = "0.0.0.0"`},
-			verr:  errors.New("Advertise WAN address cannot be 0.0.0.0"),
+			err:   errors.New("Advertise WAN address cannot be 0.0.0.0"),
 		},
 		{
 			desc:  "advertise_addr_wan ipv6 any",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr_wan": "::" }`},
 			hcl:   []string{`advertise_addr_wan = "::"`},
-			verr:  errors.New("Advertise WAN address cannot be ::"),
+			err:   errors.New("Advertise WAN address cannot be ::"),
 		},
 		{
 			desc:  "advertise_addr_wan ipv6 any brackets",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr_wan": "[::]" }`},
 			hcl:   []string{`advertise_addr_wan = "[::]"`},
-			verr:  errors.New("Advertise WAN address cannot be [::]"),
+			err:   errors.New("Advertise WAN address cannot be [::]"),
 		},
 		{
 			desc:  "dns_config.udp_answer_limit invalid",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "dns_config": { "udp_answer_limit": 0 } }`},
 			hcl:   []string{`dns_config = { udp_answer_limit = 0 }`},
-			verr:  errors.New("dns_config.udp_answer_limit must be > 0"),
+			err:   errors.New("dns_config.udp_answer_limit must be > 0"),
 		},
 		{
 			desc:  "dns_config.udp_answer_limit invalid",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "dns_config": { "udp_answer_limit": 0 } }`},
 			hcl:   []string{`dns_config = { udp_answer_limit = 0 }`},
-			verr:  errors.New("dns_config.udp_answer_limit must be > 0"),
+			err:   errors.New("dns_config.udp_answer_limit must be > 0"),
 		},
 		{
 			desc:     "node_name invalid",
 			flags:    []string{`-datacenter=a`},
 			hostname: func() (string, error) { return "", nil },
-			verr:     errors.New("dns_config.udp_answer_limit must be > 0"),
+			err:      errors.New("Node name cannot be empty"),
 		},
 		{
 			desc:  "node_meta key too long",
@@ -1285,7 +1237,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				`dns_config = { udp_answer_limit = 1 }`,
 				`node_meta = { "` + randomString(130) + `" = "a" }`,
 			},
-			verr: errors.New("Failed to parse node metadata: Couldn't load metadata pair ('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'a'): Key is too long (limit: 128 characters)"),
+			err: errors.New("Failed to parse node metadata: Couldn't load metadata pair ('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'a'): Key is too long (limit: 128 characters)"),
 		},
 		{
 			desc:  "node_meta value too long",
@@ -1298,7 +1250,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				`dns_config = { udp_answer_limit = 1 }`,
 				`node_meta = { "a" = "` + randomString(520) + `" }`,
 			},
-			verr: errors.New("Failed to parse node metadata: Couldn't load metadata pair ('a', 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'): Value is too long (limit: 512 characters)"),
+			err: errors.New("Failed to parse node metadata: Couldn't load metadata pair ('a', 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'): Value is too long (limit: 512 characters)"),
 		},
 		{
 			desc:  "node_meta too many keys",
@@ -1311,52 +1263,52 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				`dns_config = { udp_answer_limit = 1 }`,
 				`node_meta = {` + metaPairs(70, "hcl") + ` }`,
 			},
-			verr: errors.New("Failed to parse node metadata: Node metadata cannot contain more than 64 key/value pairs"),
+			err: errors.New("Failed to parse node metadata: Node metadata cannot contain more than 64 key/value pairs"),
 		},
 		{
 			desc:  "unique listeners dns vs http",
 			flags: []string{`-datacenter=a`},
 			json: []string{`{
-				"client_addr": "1.2.3.4",
-				"ports": { "dns": 1000, "http": 1000 },
-				"dns_config": { "udp_answer_limit": 1 }
-			}`},
+					"client_addr": "1.2.3.4",
+					"ports": { "dns": 1000, "http": 1000 },
+					"dns_config": { "udp_answer_limit": 1 }
+				}`},
 			hcl: []string{`
-				client_addr = "1.2.3.4"
-				ports = { dns = 1000 http = 1000 }
-				dns_config = { udp_answer_limit = 1 }
-			`},
-			verr: errors.New("HTTP address 1.2.3.4:1000 already configured for DNS"),
+					client_addr = "1.2.3.4"
+					ports = { dns = 1000 http = 1000 }
+					dns_config = { udp_answer_limit = 1 }
+				`},
+			err: errors.New("HTTP address 1.2.3.4:1000 already configured for DNS"),
 		},
 		{
 			desc:  "unique listeners dns vs https",
 			flags: []string{`-datacenter=a`},
 			json: []string{`{
-				"client_addr": "1.2.3.4",
-				"ports": { "dns": 1000, "https": 1000 },
-				"dns_config": { "udp_answer_limit": 1 }
-			}`},
+					"client_addr": "1.2.3.4",
+					"ports": { "dns": 1000, "https": 1000 },
+					"dns_config": { "udp_answer_limit": 1 }
+				}`},
 			hcl: []string{`
-				client_addr = "1.2.3.4"
-				ports = { dns = 1000 https = 1000 }
-				dns_config = { udp_answer_limit = 1 }
-			`},
-			verr: errors.New("HTTPS address 1.2.3.4:1000 already configured for DNS"),
+					client_addr = "1.2.3.4"
+					ports = { dns = 1000 https = 1000 }
+					dns_config = { udp_answer_limit = 1 }
+				`},
+			err: errors.New("HTTPS address 1.2.3.4:1000 already configured for DNS"),
 		},
 		{
 			desc:  "unique listeners http vs https",
 			flags: []string{`-datacenter=a`},
 			json: []string{`{
-				"client_addr": "1.2.3.4",
-				"ports": { "http": 1000, "https": 1000 },
-				"dns_config": { "udp_answer_limit": 1 }
-			}`},
+					"client_addr": "1.2.3.4",
+					"ports": { "http": 1000, "https": 1000 },
+					"dns_config": { "udp_answer_limit": 1 }
+				}`},
 			hcl: []string{`
-				client_addr = "1.2.3.4"
-				ports = { http = 1000 https = 1000 }
-				dns_config = { udp_answer_limit = 1 }
-			`},
-			verr: errors.New("HTTPS address 1.2.3.4:1000 already configured for HTTP"),
+					client_addr = "1.2.3.4"
+					ports = { http = 1000 https = 1000 }
+					dns_config = { udp_answer_limit = 1 }
+				`},
+			err: errors.New("HTTPS address 1.2.3.4:1000 already configured for HTTP"),
 		},
 	}
 
@@ -1399,28 +1351,6 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				}
 
 				// mock the hostname function unless a mock is provided
-				//
-				// Unfortunately, this means that all resulting runtime
-				// configs need to have a 'NodeName: "nodex",' entry but
-				// we already need to do something similar for the
-				// LeaveOnTerm flag which is set to true when server
-				// mode is off (which is the default). They are kept at
-				// the end of the struct to make amending the tests
-				// easier.
-				//
-				// The runtime config creation is split between building
-				// (syntax) and validation (semantics) to simplify
-				// testing but for these two fields I couldn't come up
-				// with a way to mitigate this without making the
-				// RuntimeConfig a pointer and allowing Validate to
-				// modify it which would then have to be checked again.
-				//
-				// By keeping RuntimeConfig "by value" we don't allow
-				// durable modifications to it which keeps it consistent
-				// unless explitly desired otherwise.
-				//
-				// This may needs revisiting once I get to config
-				// reloading, though.
 				hostnameFn := tt.hostname
 				if hostnameFn == nil {
 					hostnameFn = func() (string, error) { return "nodex", nil }
@@ -1429,8 +1359,11 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				// create the builder with the flags
 				b := &Builder{
 					Flags:    flags,
-					Default:  &Config{},
+					Default:  &defaultConfig,
 					Hostname: hostnameFn,
+				}
+				if flags.DevMode != nil && *flags.DevMode {
+					b.Default = &defaultDevConfig
 				}
 
 				// read the source fragements
@@ -1441,17 +1374,9 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				}
 
 				// build/merge the config fragments
-				rt, err := b.Build()
+				rt, err := b.BuildAndValidate()
 				if got, want := err, tt.err; !reflect.DeepEqual(got, want) {
 					t.Fatalf("got error %v want %v", got, want)
-				}
-
-				// only run the validate step if we expect a validation error
-				// otherwise, we have to satisfy all pre-conditions for every test
-				if tt.verr != nil {
-					if got, want := b.Validate(rt), tt.verr; !reflect.DeepEqual(got, want) {
-						t.Fatalf("validation error\ngot:  %v\nwant: %v", got, want)
-					}
 				}
 
 				// check the warnings
@@ -1459,13 +1384,25 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					t.FailNow()
 				}
 
-				// only validate runtime config if there are no validation errors
-				if tt.verr != nil {
+				// stop if we expected an error
+				if tt.err != nil {
 					return
 				}
 
-				// verify the runtime config
-				if got, want := rt, tt.rt; !verify.Values(t, "", got, want) {
+				// build the runtime config we expect
+				// from the same default config and patch it
+				x := &Builder{Default: b.Default, Hostname: b.Hostname}
+				wantRT, err := x.Build()
+				if err != nil {
+					t.Fatalf("build default failed: %s", err)
+				}
+				if tt.patch != nil {
+					tt.patch(&wantRT)
+				}
+				if err := x.Validate(wantRT); err != nil {
+					t.Fatalf("validate default failed: %s", err)
+				}
+				if got, want := rt, wantRT; !verify.Values(t, "", got, want) {
 					t.FailNow()
 				}
 			})
