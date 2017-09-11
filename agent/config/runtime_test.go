@@ -1335,7 +1335,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 //   random-string 8
 //
 func TestFullConfig(t *testing.T) {
-	flagSrc := []string{"-dev"}
+	flagSrc := []string{}
 	src := map[string]string{
 		"json": `{
 			"acl_agent_master_token": "furuQD0b",
@@ -1369,8 +1369,8 @@ func TestFullConfig(t *testing.T) {
 				"upgrade_version_tag": "W9pDwFAL"
 			},
 			"bind_addr": "6rFPKyh6",
-			"bootstrap": true,
-			"bootstrap_expect": 28094,
+			"bootstrap": false,
+			"bootstrap_expect": 53,
 			"ca_file": "erA7T0PM",
 			"ca_path": "mQEN1Mfp",
 			"cert_file": "7s4QAzDk",
@@ -1473,7 +1473,7 @@ func TestFullConfig(t *testing.T) {
 			"enable_debug": true,
 			"enable_script_checks": true,
 			"enable_syslog": true,
-			"enable_ui": true,
+			"enable_ui": false,
 			"encrypt": "A4wELWqH",
 			"encrypt_verify_incoming": true,
 			"encrypt_verify_outgoing": true,
@@ -1759,8 +1759,8 @@ func TestFullConfig(t *testing.T) {
 				upgrade_version_tag = "W9pDwFAL"
 			}
 			bind_addr = "6rFPKyh6"
-			bootstrap = true
-			bootstrap_expect = 28094
+			bootstrap = false
+			bootstrap_expect = 53
 			ca_file = "erA7T0PM"
 			ca_path = "mQEN1Mfp"
 			cert_file = "7s4QAzDk"
@@ -1863,7 +1863,7 @@ func TestFullConfig(t *testing.T) {
 			enable_debug = true
 			enable_script_checks = true
 			enable_syslog = true
-			enable_ui = true
+			enable_ui = false
 			encrypt = "A4wELWqH"
 			encrypt_verify_incoming = true
 			encrypt_verify_outgoing = true
@@ -2139,8 +2139,8 @@ func TestFullConfig(t *testing.T) {
 		AutopilotServerStabilizationTime: 23057 * time.Second,
 		AutopilotUpgradeVersionTag:       "W9pDwFAL",
 		BindAddrs:                        []string{"6rFPKyh6"},
-		Bootstrap:                        true,
-		BootstrapExpect:                  28094,
+		Bootstrap:                        false,
+		BootstrapExpect:                  53,
 		CAFile:                           "erA7T0PM",
 		CAPath:                           "mQEN1Mfp",
 		CertFile:                         "7s4QAzDk",
@@ -2232,7 +2232,7 @@ func TestFullConfig(t *testing.T) {
 		DNSUDPAnswerLimit:         29909,
 		DataDir:                   "oTOOIoV9",
 		Datacenter:                "rzo029wg",
-		DevMode:                   true,
+		DevMode:                   false,
 		DisableAnonymousSignature: true,
 		DisableCoordinates:        true,
 		DisableHostNodeID:         true,
@@ -2243,7 +2243,7 @@ func TestFullConfig(t *testing.T) {
 		EnableDebug:               true,
 		EnableScriptChecks:        true,
 		EnableSyslog:              true,
-		EnableUI:                  true,
+		EnableUI:                  false,
 		EncryptKey:                "A4wELWqH",
 		EncryptVerifyIncoming:     true,
 		EncryptVerifyOutgoing:     true,
@@ -2482,6 +2482,10 @@ func TestFullConfig(t *testing.T) {
 		VerifyServerHostname:                        true,
 	}
 
+	warns := []string{
+		"BootstrapExpect mode enabled, expecting 53 servers",
+	}
+
 	// ensure that all fields are set to unique non-zero values
 	// todo(fs): This currently fails since ServiceDefinition.Check is not used
 	// if err := nonZero("RuntimeConfig", nil, want); err != nil {
@@ -2510,8 +2514,11 @@ func TestFullConfig(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Build: %s", err)
 			}
-			if len(b.Warnings) > 0 {
-				t.Fatal("got %d warnings want 0: %v", len(b.Warnings), b.Warnings)
+			if err := b.Validate(rt); err != nil {
+				t.Fatalf("Validate: %s", err)
+			}
+			if got, want := b.Warnings, warns; !verify.Values(t, "warnings", got, want) {
+				t.FailNow()
 			}
 			if !verify.Values(t, "", rt, want) {
 				t.FailNow()
