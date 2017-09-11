@@ -38,62 +38,63 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		{
 			desc:  "-advertise",
 			flags: []string{`-advertise`, `a`},
-			rt:    RuntimeConfig{AdvertiseAddrLAN: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, AdvertiseAddrLAN: "a"},
 		},
 		{
 			desc:  "-advertise-wan",
 			flags: []string{`-advertise-wan`, `a`},
-			rt:    RuntimeConfig{AdvertiseAddrWAN: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, AdvertiseAddrWAN: "a"},
 		},
 		{
 			desc:  "-bind",
 			flags: []string{`-bind`, `1.2.3.4`},
-			rt:    RuntimeConfig{BindAddrs: []string{"1.2.3.4"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, BindAddrs: []string{"1.2.3.4"}},
 		},
 		{
 			desc:  "-bootstrap",
 			flags: []string{`-bootstrap`},
-			rt:    RuntimeConfig{Bootstrap: true},
+			rt:    RuntimeConfig{LeaveOnTerm: true, Bootstrap: true},
 		},
 		{
 			desc:  "-bootstrap-expect",
 			flags: []string{`-bootstrap-expect`, `3`},
-			rt:    RuntimeConfig{BootstrapExpect: 3},
+			rt:    RuntimeConfig{LeaveOnTerm: true, BootstrapExpect: 3},
 		},
 		{
 			desc:  "-client",
 			flags: []string{`-client`, `1.2.3.4`},
-			rt:    RuntimeConfig{ClientAddrs: []string{"1.2.3.4"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, ClientAddrs: []string{"1.2.3.4"}},
 		},
 		{
 			desc:  "-data-dir",
 			flags: []string{`-data-dir`, `a`},
-			rt:    RuntimeConfig{DataDir: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, DataDir: "a"},
 		},
 		{
 			desc:  "-datacenter",
 			flags: []string{`-datacenter`, `a`},
-			rt:    RuntimeConfig{Datacenter: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, Datacenter: "a"},
 		},
 		{
 			desc:  "-dev",
 			flags: []string{`-dev`},
-			rt:    RuntimeConfig{DevMode: true},
+			rt:    RuntimeConfig{LeaveOnTerm: true, DevMode: true},
 		},
 		{
 			desc:  "-disable-host-node-id",
 			flags: []string{`-disable-host-node-id`},
-			rt:    RuntimeConfig{DisableHostNodeID: true},
+			rt:    RuntimeConfig{LeaveOnTerm: true, DisableHostNodeID: true},
 		},
 		{
 			desc:  "-disable-keyring-file",
 			flags: []string{`-disable-keyring-file`},
-			rt:    RuntimeConfig{DisableKeyringFile: true},
+			rt:    RuntimeConfig{LeaveOnTerm: true, DisableKeyringFile: true},
 		},
 		{
 			desc:  "-dns-port",
 			flags: []string{`-dns-port`, `123`, `-client`, `0.0.0.0`},
 			rt: RuntimeConfig{
+				LeaveOnTerm: true,
 				ClientAddrs: []string{"0.0.0.0"},
 				DNSPort:     123,
 				DNSAddrs:    []string{":123"},
@@ -102,22 +103,23 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		{
 			desc:  "-domain",
 			flags: []string{`-domain`, `a`},
-			rt:    RuntimeConfig{DNSDomain: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, DNSDomain: "a"},
 		},
 		{
 			desc:  "-enable-script-checks",
 			flags: []string{`-enable-script-checks`},
-			rt:    RuntimeConfig{EnableScriptChecks: true},
+			rt:    RuntimeConfig{LeaveOnTerm: true, EnableScriptChecks: true},
 		},
 		{ // todo(fs): shouldn't this be '-encrypt-key'?
 			desc:  "-encrypt",
 			flags: []string{`-encrypt`, `a`},
-			rt:    RuntimeConfig{EncryptKey: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, EncryptKey: "a"},
 		},
 		{
 			desc:  "-http-port",
 			flags: []string{`-http-port`, `123`, `-client`, `0.0.0.0`},
 			rt: RuntimeConfig{
+				LeaveOnTerm: true,
 				ClientAddrs: []string{"0.0.0.0"},
 				HTTPPort:    123,
 				HTTPAddrs:   []string{":123"},
@@ -126,122 +128,122 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		{
 			desc:  "-join",
 			flags: []string{`-join`, `a`, `-join`, `b`},
-			rt:    RuntimeConfig{StartJoinAddrsLAN: []string{"a", "b"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, StartJoinAddrsLAN: []string{"a", "b"}},
 		},
 		{
 			desc:  "-join-wan",
 			flags: []string{`-join-wan`, `a`, `-join-wan`, `b`},
-			rt:    RuntimeConfig{StartJoinAddrsWAN: []string{"a", "b"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, StartJoinAddrsWAN: []string{"a", "b"}},
 		},
 		{
 			desc:  "-log-level",
 			flags: []string{`-log-level`, `a`},
-			rt:    RuntimeConfig{LogLevel: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, LogLevel: "a"},
 		},
 		{ // todo(fs): shouldn't this be '-node-name'?
 			desc:  "-node",
 			flags: []string{`-node`, `a`},
-			rt:    RuntimeConfig{NodeName: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, NodeName: "a"},
 		},
 		{
 			desc:  "-node-id",
 			flags: []string{`-node-id`, `a`},
-			rt:    RuntimeConfig{NodeID: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, NodeID: "a"},
 		},
 		{
 			desc:  "-node-meta",
 			flags: []string{`-node-meta`, `a:b`, `-node-meta`, `c:d`},
-			rt:    RuntimeConfig{NodeMeta: map[string]string{"a": "b", "c": "d"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, NodeMeta: map[string]string{"a": "b", "c": "d"}},
 		},
 		{
 			desc:  "-non-voting-server",
 			flags: []string{`-non-voting-server`},
-			rt:    RuntimeConfig{NonVotingServer: true},
+			rt:    RuntimeConfig{LeaveOnTerm: true, NonVotingServer: true},
 		},
 		{
 			desc:  "-pid-file",
 			flags: []string{`-pid-file`, `a`},
-			rt:    RuntimeConfig{PidFile: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, PidFile: "a"},
 		},
 		{
 			desc:  "-protocol",
 			flags: []string{`-protocol`, `1`},
-			rt:    RuntimeConfig{RPCProtocol: 1},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RPCProtocol: 1},
 		},
 		{
 			desc:  "-raft-protocol",
 			flags: []string{`-raft-protocol`, `1`},
-			rt:    RuntimeConfig{RaftProtocol: 1},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RaftProtocol: 1},
 		},
 		{
 			desc:  "-recursor",
 			flags: []string{`-recursor`, `a`, `-recursor`, `b`},
-			rt:    RuntimeConfig{DNSRecursors: []string{"a", "b"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, DNSRecursors: []string{"a", "b"}},
 		},
 		{
 			desc:  "-rejoin",
 			flags: []string{`-rejoin`},
-			rt:    RuntimeConfig{RejoinAfterLeave: true},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RejoinAfterLeave: true},
 		},
 		{
 			desc:  "-retry-interval",
 			flags: []string{`-retry-interval`, `5s`},
-			rt:    RuntimeConfig{RetryJoinIntervalLAN: 5 * time.Second},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinIntervalLAN: 5 * time.Second},
 		},
 		{
 			desc:  "-retry-interval-wan",
 			flags: []string{`-retry-interval-wan`, `5s`},
-			rt:    RuntimeConfig{RetryJoinIntervalWAN: 5 * time.Second},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinIntervalWAN: 5 * time.Second},
 		},
 		{
 			desc:  "-retry-join",
 			flags: []string{`-retry-join`, `a`, `-retry-join`, `b`},
-			rt:    RuntimeConfig{RetryJoinLAN: []string{"a", "b"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinLAN: []string{"a", "b"}},
 		},
 		{
 			desc:  "-retry-join-wan",
 			flags: []string{`-retry-join-wan`, `a`, `-retry-join-wan`, `b`},
-			rt:    RuntimeConfig{RetryJoinWAN: []string{"a", "b"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinWAN: []string{"a", "b"}},
 		},
 		{
 			desc:  "-retry-max",
 			flags: []string{`-retry-max`, `1`},
-			rt:    RuntimeConfig{RetryJoinMaxAttemptsLAN: 1},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinMaxAttemptsLAN: 1},
 		},
 		{
 			desc:  "-retry-max-wan",
 			flags: []string{`-retry-max-wan`, `1`},
-			rt:    RuntimeConfig{RetryJoinMaxAttemptsWAN: 1},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinMaxAttemptsWAN: 1},
 		},
 		{
 			desc:  "-serf-lan-bind",
 			flags: []string{`-serf-lan-bind`, `a`},
-			rt:    RuntimeConfig{SerfBindAddrLAN: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, SerfBindAddrLAN: "a"},
 		},
 		{
 			desc:  "-serf-wan-bind",
 			flags: []string{`-serf-wan-bind`, `a`},
-			rt:    RuntimeConfig{SerfBindAddrWAN: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, SerfBindAddrWAN: "a"},
 		},
 		{
 			desc:  "-server",
 			flags: []string{`-server`},
-			rt:    RuntimeConfig{ServerMode: true},
+			rt:    RuntimeConfig{SkipLeaveOnInt: true, ServerMode: true},
 		},
 		{
 			desc:  "-syslog",
 			flags: []string{`-syslog`},
-			rt:    RuntimeConfig{EnableSyslog: true},
+			rt:    RuntimeConfig{LeaveOnTerm: true, EnableSyslog: true},
 		},
 		{
 			desc:  "-ui",
 			flags: []string{`-ui`},
-			rt:    RuntimeConfig{EnableUI: true},
+			rt:    RuntimeConfig{LeaveOnTerm: true, EnableUI: true},
 		},
 		{
 			desc:  "-ui-dir",
 			flags: []string{`-ui-dir`, `a`},
-			rt:    RuntimeConfig{UIDir: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, UIDir: "a"},
 		},
 
 		// ------------------------------------------------------------
@@ -251,81 +253,85 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		{
 			desc:  "-atlas",
 			flags: []string{`-atlas`, `a`},
+			rt:    RuntimeConfig{LeaveOnTerm: true},
 			warns: []string{`'-atlas' is deprecated`},
 		},
 		{
 			desc:  "-atlas-join",
 			flags: []string{`-atlas-join`},
+			rt:    RuntimeConfig{LeaveOnTerm: true},
 			warns: []string{`'-atlas-join' is deprecated`},
 		},
 		{
 			desc:  "-atlas-endpoint",
 			flags: []string{`-atlas-endpoint`, `a`},
+			rt:    RuntimeConfig{LeaveOnTerm: true},
 			warns: []string{`'-atlas-endpoint' is deprecated`},
 		},
 		{
 			desc:  "-atlas-token",
 			flags: []string{`-atlas-token`, `a`},
+			rt:    RuntimeConfig{LeaveOnTerm: true},
 			warns: []string{`'-atlas-token' is deprecated`},
 		},
 		{
 			desc:  "-dc",
 			flags: []string{`-dc`, `a`},
-			rt:    RuntimeConfig{Datacenter: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, Datacenter: "a"},
 			warns: []string{`'-dc' is deprecated. Use '-datacenter' instead`},
 		},
 		{
 			desc:  "-retry-join-azure-tag-name",
 			flags: []string{`-retry-join-azure-tag-name`, `a`},
-			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=azure tag_name=a"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinLAN: []string{"provider=azure tag_name=a"}},
 			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_name=a" to retry_join.`},
 		},
 		{
 			desc:  "-retry-join-azure-tag-value",
 			flags: []string{`-retry-join-azure-tag-value`, `a`},
-			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=azure tag_value=a"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinLAN: []string{"provider=azure tag_value=a"}},
 			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_value=a" to retry_join.`},
 		},
 		{
 			desc:  "-retry-join-ec2-region",
 			flags: []string{`-retry-join-ec2-region`, `a`},
-			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=aws region=a"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinLAN: []string{"provider=aws region=a"}},
 			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws region=a" to retry_join.`},
 		},
 		{
 			desc:  "-retry-join-ec2-tag-key",
 			flags: []string{`-retry-join-ec2-tag-key`, `a`},
-			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=aws tag_key=a"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinLAN: []string{"provider=aws tag_key=a"}},
 			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_key=a" to retry_join.`},
 		},
 		{
 			desc:  "-retry-join-ec2-tag-value",
 			flags: []string{`-retry-join-ec2-tag-value`, `a`},
-			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=aws tag_value=a"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinLAN: []string{"provider=aws tag_value=a"}},
 			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_value=a" to retry_join.`},
 		},
 		{
 			desc:  "-retry-join-gce-credentials-file",
 			flags: []string{`-retry-join-gce-credentials-file`, `a`},
-			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=gce credentials_file=a"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinLAN: []string{"provider=gce credentials_file=a"}},
 			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden" to retry_join.`},
 		},
 		{
 			desc:  "-retry-join-gce-project-name",
 			flags: []string{`-retry-join-gce-project-name`, `a`},
-			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=gce project_name=a"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinLAN: []string{"provider=gce project_name=a"}},
 			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce project_name=a" to retry_join.`},
 		},
 		{
 			desc:  "-retry-join-gce-tag-value",
 			flags: []string{`-retry-join-gce-tag-value`, `a`},
-			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=gce tag_value=a"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinLAN: []string{"provider=gce tag_value=a"}},
 			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce tag_value=a" to retry_join.`},
 		},
 		{
 			desc:  "-retry-join-gce-zone-pattern",
 			flags: []string{`-retry-join-gce-zone-pattern`, `a`},
-			rt:    RuntimeConfig{RetryJoinLAN: []string{"provider=gce zone_pattern=a"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, RetryJoinLAN: []string{"provider=gce zone_pattern=a"}},
 			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce zone_pattern=a" to retry_join.`},
 		},
 
@@ -337,35 +343,35 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			desc:  "check.service_id alias",
 			json:  []string{`{"check":{ "service_id":"d", "serviceid":"dd" }}`},
 			hcl:   []string{`check = { service_id="d" serviceid="dd" }`},
-			rt:    RuntimeConfig{Checks: []*structs.CheckDefinition{{ServiceID: "dd"}}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, Checks: []*structs.CheckDefinition{{ServiceID: "dd"}}},
 			warns: []string{`config: "serviceid" is deprecated in check definitions. Please use "service_id" instead.`},
 		},
 		{
 			desc:  "check.docker_container_id alias",
 			json:  []string{`{"check":{ "docker_container_id":"k", "dockercontainerid":"kk" }}`},
 			hcl:   []string{`check = { docker_container_id="k" dockercontainerid="kk" }`},
-			rt:    RuntimeConfig{Checks: []*structs.CheckDefinition{{DockerContainerID: "kk"}}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, Checks: []*structs.CheckDefinition{{DockerContainerID: "kk"}}},
 			warns: []string{`config: "dockercontainerid" is deprecated in check definitions. Please use "docker_container_id" instead.`},
 		},
 		{
 			desc:  "check.tls_skip_verify alias",
 			json:  []string{`{"check":{ "tls_skip_verify":true, "tlsskipverify":false }}`},
 			hcl:   []string{`check = { tls_skip_verify=true tlsskipverify=false }`},
-			rt:    RuntimeConfig{Checks: []*structs.CheckDefinition{{TLSSkipVerify: false}}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, Checks: []*structs.CheckDefinition{{TLSSkipVerify: false}}},
 			warns: []string{`config: "tlsskipverify" is deprecated in check definitions. Please use "tls_skip_verify" instead.`},
 		},
 		{
 			desc:  "check.deregister_critical_service_after alias",
 			json:  []string{`{"check":{ "deregister_critical_service_after":"5s", "deregistercriticalserviceafter": "10s" }}`},
 			hcl:   []string{`check = { deregister_critical_service_after="5s" deregistercriticalserviceafter="10s"}`},
-			rt:    RuntimeConfig{Checks: []*structs.CheckDefinition{{DeregisterCriticalServiceAfter: 10 * time.Second}}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, Checks: []*structs.CheckDefinition{{DeregisterCriticalServiceAfter: 10 * time.Second}}},
 			warns: []string{`config: "deregistercriticalserviceafter" is deprecated in check definitions. Please use "deregister_critical_service_after" instead.`},
 		},
 		{
 			desc:  "http_api_response_headers",
 			json:  []string{`{"http_api_response_headers":{"a":"b","c":"d"}}`},
 			hcl:   []string{`http_api_response_headers = {"a"="b" "c"="d"}`},
-			rt:    RuntimeConfig{HTTPResponseHeaders: map[string]string{"a": "b", "c": "d"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, HTTPResponseHeaders: map[string]string{"a": "b", "c": "d"}},
 			warns: []string{`config: "http_api_response_headers" is deprecated. Please use "http_config.response_headers" instead.`},
 		},
 		{
@@ -391,6 +397,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				}
 			`},
 			rt: RuntimeConfig{
+				LeaveOnTerm:  true,
 				RetryJoinLAN: []string{"provider=azure client_id=e secret_access_key=f subscription_id=c tag_name=a tag_value=b tenant_id=d"},
 			},
 			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure client_id=hidden secret_access_key=hidden subscription_id=hidden tag_name=a tag_value=b tenant_id=hidden" to retry_join.`},
@@ -416,6 +423,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				}
 			`},
 			rt: RuntimeConfig{
+				LeaveOnTerm:  true,
 				RetryJoinLAN: []string{"provider=aws access_key_id=d region=c secret_access_key=e tag_key=a tag_value=b"},
 			},
 			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws access_key_id=hidden region=c secret_access_key=hidden tag_key=a tag_value=b" to retry_join.`},
@@ -439,6 +447,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				}
 			`},
 			rt: RuntimeConfig{
+				LeaveOnTerm:  true,
 				RetryJoinLAN: []string{"provider=gce credentials_file=d project_name=a tag_value=c zone_pattern=b"},
 			},
 			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden project_name=a tag_value=c zone_pattern=b" to retry_join.`},
@@ -448,35 +457,35 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			desc:  "telemetry.dogstatsd_addr alias",
 			json:  []string{`{"dogstatsd_addr":"a", "telemetry":{"dogstatsd_addr": "b"}}`},
 			hcl:   []string{`dogstatsd_addr = "a" telemetry = { dogstatsd_addr = "b"}`},
-			rt:    RuntimeConfig{TelemetryDogstatsdAddr: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, TelemetryDogstatsdAddr: "a"},
 			warns: []string{`config: "dogstatsd_addr" is deprecated. Please use "telemetry.dogstatsd_addr" instead.`},
 		},
 		{
 			desc:  "telemetry.dogstatsd_tags alias",
 			json:  []string{`{"dogstatsd_tags":["a", "b"], "telemetry": { "dogstatsd_tags": ["c", "d"]}}`},
 			hcl:   []string{`dogstatsd_tags = ["a", "b"] telemetry = { dogstatsd_tags = ["c", "d"] }`},
-			rt:    RuntimeConfig{TelemetryDogstatsdTags: []string{"a", "b", "c", "d"}},
+			rt:    RuntimeConfig{LeaveOnTerm: true, TelemetryDogstatsdTags: []string{"a", "b", "c", "d"}},
 			warns: []string{`config: "dogstatsd_tags" is deprecated. Please use "telemetry.dogstatsd_tags" instead.`},
 		},
 		{
 			desc:  "telemetry.statsd_addr alias",
 			json:  []string{`{"statsd_addr":"a", "telemetry":{"statsd_addr": "b"}}`},
 			hcl:   []string{`statsd_addr = "a" telemetry = { statsd_addr = "b" }`},
-			rt:    RuntimeConfig{TelemetryStatsdAddr: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, TelemetryStatsdAddr: "a"},
 			warns: []string{`config: "statsd_addr" is deprecated. Please use "telemetry.statsd_addr" instead.`},
 		},
 		{
 			desc:  "telemetry.statsite_addr alias",
 			json:  []string{`{"statsite_addr":"a", "telemetry":{ "statsite_addr": "b" }}`},
 			hcl:   []string{`statsite_addr = "a" telemetry = { statsite_addr = "b"}`},
-			rt:    RuntimeConfig{TelemetryStatsiteAddr: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, TelemetryStatsiteAddr: "a"},
 			warns: []string{`config: "statsite_addr" is deprecated. Please use "telemetry.statsite_addr" instead.`},
 		},
 		{
 			desc:  "telemetry.statsite_prefix alias",
 			json:  []string{`{"statsite_prefix":"a", "telemetry":{ "statsite_prefix": "b" }}`},
 			hcl:   []string{`statsite_prefix = "a" telemetry = { statsite_prefix = "b" }`},
-			rt:    RuntimeConfig{TelemetryStatsitePrefix: "a"},
+			rt:    RuntimeConfig{LeaveOnTerm: true, TelemetryStatsitePrefix: "a"},
 			warns: []string{`config: "statsite_prefix" is deprecated. Please use "telemetry.statsite_prefix" instead.`},
 		},
 
@@ -495,6 +504,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				ports {}
 			`},
 			rt: RuntimeConfig{
+				LeaveOnTerm: true,
 				ClientAddrs: []string{"0.0.0.0"},
 			},
 		},
@@ -509,6 +519,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				ports { dns = -1 http = -2 https = -3 }
 			`},
 			rt: RuntimeConfig{
+				LeaveOnTerm: true,
 				ClientAddrs: []string{"0.0.0.0"},
 			},
 		},
@@ -523,6 +534,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				ports { dns = -1 http = -2 https = -3 }
 			`},
 			rt: RuntimeConfig{
+				LeaveOnTerm: true,
 				ClientAddrs: []string{"0.0.0.0"},
 			},
 		},
@@ -537,6 +549,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				ports { dns = 1 http = 2 https = 3 }
 			`},
 			rt: RuntimeConfig{
+				LeaveOnTerm: true,
 				ClientAddrs: []string{"0.0.0.0"},
 				DNSPort:     1,
 				HTTPPort:    2,
@@ -560,6 +573,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				ports {}
 			`},
 			rt: RuntimeConfig{
+				LeaveOnTerm: true,
 				ClientAddrs: []string{"0.0.0.0"},
 			},
 		},
@@ -576,6 +590,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				ports { dns = -1 http = -2 https = -3 }
 			`},
 			rt: RuntimeConfig{
+				LeaveOnTerm: true,
 				ClientAddrs: []string{"0.0.0.0"},
 			},
 		},
@@ -592,6 +607,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				ports { dns = 1 http = 2 https = 3 }
 			`},
 			rt: RuntimeConfig{
+				LeaveOnTerm: true,
 				ClientAddrs: []string{"0.0.0.0"},
 				DNSPort:     1,
 				HTTPPort:    2,
@@ -612,6 +628,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				ports { dns = 1 http = 2 https = 3 }
 			`},
 			rt: RuntimeConfig{
+				LeaveOnTerm: true,
 				ClientAddrs: []string{"1.2.3.4", "unix://foo", "2001:db8::1"},
 				DNSPort:     1,
 				HTTPPort:    2,
@@ -642,6 +659,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				ports { dns = 1 http = 2 https = 3 }
 			`},
 			rt: RuntimeConfig{
+				LeaveOnTerm: true,
 				ClientAddrs: []string{"1.2.3.4", "unix://foo", "2001:db8::1"},
 				DNSPort:     1,
 				HTTPPort:    2,
@@ -655,37 +673,37 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			desc: "advertise address lan template",
 			json: []string{`{ "advertise_addr": "{{ printf \"1.2.3.4\" }}" }`},
 			hcl:  []string{`advertise_addr = "{{ printf \"1.2.3.4\" }}"`},
-			rt:   RuntimeConfig{AdvertiseAddrLAN: "1.2.3.4"},
+			rt:   RuntimeConfig{LeaveOnTerm: true, AdvertiseAddrLAN: "1.2.3.4"},
 		},
 		{
 			desc: "advertise address wan template",
 			json: []string{`{ "advertise_addr_wan": "{{ printf \"1.2.3.4\" }}" }`},
 			hcl:  []string{`advertise_addr_wan = "{{ printf \"1.2.3.4\" }}"`},
-			rt:   RuntimeConfig{AdvertiseAddrWAN: "1.2.3.4"},
+			rt:   RuntimeConfig{LeaveOnTerm: true, AdvertiseAddrWAN: "1.2.3.4"},
 		},
 		{
 			desc: "serf advertise address lan template",
 			json: []string{`{ "advertise_addrs": { "serf_lan": "{{ printf \"1.2.3.4\" }}" } }`},
 			hcl:  []string{`advertise_addrs = { serf_lan = "{{ printf \"1.2.3.4\" }}" }`},
-			rt:   RuntimeConfig{SerfAdvertiseAddrLAN: "1.2.3.4"},
+			rt:   RuntimeConfig{LeaveOnTerm: true, SerfAdvertiseAddrLAN: "1.2.3.4"},
 		},
 		{
 			desc: "serf advertise address wan template",
 			json: []string{`{ "advertise_addrs": { "serf_wan": "{{ printf \"1.2.3.4\" }}" } }`},
 			hcl:  []string{`advertise_addrs = { serf_wan = "{{ printf \"1.2.3.4\" }}" }`},
-			rt:   RuntimeConfig{SerfAdvertiseAddrWAN: "1.2.3.4"},
+			rt:   RuntimeConfig{LeaveOnTerm: true, SerfAdvertiseAddrWAN: "1.2.3.4"},
 		},
 		{
 			desc: "serf bind address lan template",
 			json: []string{`{ "serf_lan": "{{ printf \"1.2.3.4\" }}" }`},
 			hcl:  []string{`serf_lan = "{{ printf \"1.2.3.4\" }}"`},
-			rt:   RuntimeConfig{SerfBindAddrLAN: "1.2.3.4"},
+			rt:   RuntimeConfig{LeaveOnTerm: true, SerfBindAddrLAN: "1.2.3.4"},
 		},
 		{
 			desc: "serf bind address wan template",
 			json: []string{`{ "serf_wan": "{{ printf \"1.2.3.4\" }}" }`},
 			hcl:  []string{`serf_wan = "{{ printf \"1.2.3.4\" }}"`},
-			rt:   RuntimeConfig{SerfBindAddrWAN: "1.2.3.4"},
+			rt:   RuntimeConfig{LeaveOnTerm: true, SerfBindAddrWAN: "1.2.3.4"},
 		},
 
 		// ------------------------------------------------------------
@@ -727,6 +745,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				`,
 			},
 			rt: RuntimeConfig{
+				LeaveOnTerm:       true,
 				Bootstrap:         false,
 				BootstrapExpect:   2,
 				Datacenter:        "b",
@@ -777,6 +796,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				`-serf-wan-bind`, `b`,
 			},
 			rt: RuntimeConfig{
+				LeaveOnTerm:       true,
 				AdvertiseAddrLAN:  "b",
 				AdvertiseAddrWAN:  "b",
 				Bootstrap:         false,
@@ -798,13 +818,13 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			desc: "datacenter is lower-cased",
 			json: []string{`{ "datacenter": "A" }`},
 			hcl:  []string{`datacenter = "A"`},
-			rt:   RuntimeConfig{Datacenter: "a"},
+			rt:   RuntimeConfig{LeaveOnTerm: true, Datacenter: "a"},
 		},
 		{
 			desc: "acl_datacenter is lower-cased",
 			json: []string{`{ "acl_datacenter": "A" }`},
 			hcl:  []string{`acl_datacenter = "A"`},
-			rt:   RuntimeConfig{ACLDatacenter: "a"},
+			rt:   RuntimeConfig{LeaveOnTerm: true, ACLDatacenter: "a"},
 		},
 		{
 			desc: "datacenter invalid",

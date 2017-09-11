@@ -22,6 +22,16 @@ import (
 	"github.com/hashicorp/hcl"
 )
 
+// todo(fs): port SetupTaggedAndAdvertiseAddrs
+// todo(fs): port existing validation from command/agent.go
+// todo(fs): support dev config
+// todo(fs): validate node_meta data
+// todo(fs): add new limit and segments
+// todo(fs): add tests for errors
+// todo(fs): check ip addrs are valid
+// todo(fs): check sockets not allowed for advertise and serf bind addrs
+// todo(fs): port VerifyUniqueListeners
+
 // Builder constructs a valid runtime configuration from multiple
 // configuration fragments.
 //
@@ -240,6 +250,16 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		return RuntimeConfig{}, fmt.Errorf("invalid tls cipher suites: %s", err)
 	}
 
+	leaveOnTerm := !b.boolVal(c.ServerMode)
+	if c.LeaveOnTerm != nil {
+		leaveOnTerm = b.boolVal(c.LeaveOnTerm)
+	}
+
+	skipLeaveOnInt := b.boolVal(c.ServerMode)
+	if c.SkipLeaveOnInt != nil {
+		skipLeaveOnInt = b.boolVal(c.SkipLeaveOnInt)
+	}
+
 	// ----------------------------------------------------------------
 	// checks and services
 	//
@@ -320,14 +340,6 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	serfAdvertiseAddrWAN := b.singleIPTemplateVal("serf advertise wan", c.AdvertiseAddrs.SerfWAN)
 	serfBindAddrLAN := b.singleIPTemplateVal("serf bind lan", c.SerfBindAddrLAN)
 	serfBindAddrWAN := b.singleIPTemplateVal("serf bind wan", c.SerfBindAddrWAN)
-
-	// todo(fs): port SetupTaggedAndAdvertiseAddrs
-
-	// todo(fs): port existing validation from command/agent.go
-	// todo(fs): support dev config
-	// todo(fs): validate node_meta data
-	// todo(fs): add new limit and segments
-	// todo(fs): add tests for errors
 
 	// ----------------------------------------------------------------
 	// deprecated fields
@@ -557,7 +569,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		EncryptVerifyIncoming:       b.boolVal(c.EncryptVerifyIncoming),
 		EncryptVerifyOutgoing:       b.boolVal(c.EncryptVerifyOutgoing),
 		KeyFile:                     b.stringVal(c.KeyFile),
-		LeaveOnTerm:                 b.boolVal(c.LeaveOnTerm),
+		LeaveOnTerm:                 leaveOnTerm,
 		LogLevel:                    b.stringVal(c.LogLevel),
 		NodeID:                      b.stringVal(c.NodeID),
 		NodeMeta:                    c.NodeMeta,
@@ -583,7 +595,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		ServerName:                  b.stringVal(c.ServerName),
 		Services:                    services,
 		SessionTTLMin:               b.durationVal(c.SessionTTLMin),
-		SkipLeaveOnInt:              b.boolVal(c.SkipLeaveOnInt),
+		SkipLeaveOnInt:              skipLeaveOnInt,
 		StartJoinAddrsLAN:           c.StartJoinAddrsLAN,
 		StartJoinAddrsWAN:           c.StartJoinAddrsWAN,
 		SyslogFacility:              b.stringVal(c.SyslogFacility),
@@ -614,10 +626,6 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 
 // Validate performs semantical validation of the runtime configuration.
 func (b *Builder) Validate(rt RuntimeConfig) error {
-	// todo(fs): check ip addrs are valid
-	// todo(fs): check sockets not allowed for advertise and serf bind addrs
-	// todo(fs): port VerifyUniqueListeners
-
 	if rt.AutopilotMaxTrailingLogs < 0 {
 		return fmt.Errorf("autopilot.max_trailing_logs < 0")
 	}

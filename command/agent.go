@@ -245,7 +245,7 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 	// done: cmdCfg.DNSRecursors = append(cmdCfg.DNSRecursors, dnsRecursors...)
 
 	// done: cfg = agent.MergeConfig(cfg, &cmdCfg)
-	disableHostNodeID.Merge(cfg.DisableHostNodeID)
+	// done: disableHostNodeID.Merge(cfg.DisableHostNodeID)
 
 	if cfg.NodeName == "" {
 		hostname, err := os.Hostname()
@@ -263,12 +263,12 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 
 	// Make sure LeaveOnTerm and SkipLeaveOnInt are set to the right
 	// defaults based on the agent's mode (client or server).
-	if cfg.LeaveOnTerm == nil {
-		cfg.LeaveOnTerm = agent.Bool(!cfg.Server)
-	}
-	if cfg.SkipLeaveOnInt == nil {
-		cfg.SkipLeaveOnInt = agent.Bool(cfg.Server)
-	}
+	// done: if cfg.LeaveOnTerm == nil {
+	// done: 	cfg.LeaveOnTerm = agent.Bool(!cfg.Server)
+	// done: }
+	// done: if cfg.SkipLeaveOnInt == nil {
+	// done: 	cfg.SkipLeaveOnInt = agent.Bool(cfg.Server)
+	// done: }
 
 	// Ensure we have a data directory if we are not in dev mode.
 	if !dev {
