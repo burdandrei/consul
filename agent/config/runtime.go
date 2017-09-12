@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/agent/structs"
+	"golang.org/x/time/rate"
 )
 
 // RuntimeConfig specifies the configuration the consul agent actually
@@ -101,6 +102,8 @@ type RuntimeConfig struct {
 	NonVotingServer             bool
 	PidFile                     string
 	RPCProtocol                 int
+	RPCRateLimit                rate.Limit
+	RPCMaxBurst                 int
 	RaftProtocol                int
 	ReconnectTimeoutLAN         time.Duration
 	ReconnectTimeoutWAN         time.Duration
@@ -111,6 +114,8 @@ type RuntimeConfig struct {
 	RetryJoinMaxAttemptsLAN     int
 	RetryJoinMaxAttemptsWAN     int
 	RetryJoinWAN                []string
+	Segment                     string
+	Segments                    []structs.NetworkSegment
 	ServerMode                  bool
 	ServerName                  string
 	Services                    []*structs.ServiceDefinition

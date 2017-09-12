@@ -3,6 +3,8 @@ package config
 import (
 	"time"
 
+	"math"
+
 	"github.com/hashicorp/consul/agent/consul"
 )
 
@@ -10,6 +12,7 @@ func pBool(v bool) *bool                { return &v }
 func pInt(v int) *int                   { return &v }
 func pString(v string) *string          { return &v }
 func pDuration(v time.Duration) *string { s := v.String(); return &s }
+func pFloat64(v float64) *float64       { return &v }
 
 // defaultConfig is the default configuration file.
 var defaultConfig = Config{
@@ -58,11 +61,10 @@ var defaultConfig = Config{
 	EncryptVerifyOutgoing: pBool(true),
 
 	DisableHostNodeID: pBool(true),
-	// 		Limits: Limits{
-	// 			RPCRate:     rate.Inf,
-	// 			RPCMaxBurst: 1000,
-	// 		},
-
+	Limits: Limits{
+		RPCRate:     pFloat64(math.MaxFloat64),
+		RPCMaxBurst: pInt(1000),
+	},
 }
 
 // todo(fs): fix me

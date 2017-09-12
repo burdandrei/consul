@@ -20,6 +20,7 @@ import (
 	discover "github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-sockaddr/template"
 	"github.com/hashicorp/hcl"
+	"golang.org/x/time/rate"
 )
 
 // todo(fs): port SetupTaggedAndAdvertiseAddrs
@@ -352,6 +353,18 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	serfBindAddrLAN := b.singleIPTemplateVal("serf bind lan", c.SerfBindAddrLAN)
 	serfBindAddrWAN := b.singleIPTemplateVal("serf bind wan", c.SerfBindAddrWAN)
 
+	// segments
+	var segments []structs.NetworkSegment
+	for _, segment := range c.Segments {
+		segments = append(segments, structs.NetworkSegment{
+			Name:        b.stringVal(segment.Name),
+			Bind:        b.stringVal(segment.Bind),
+			Port:        b.intVal(segment.Port),
+			RPCListener: b.boolVal(segment.RPCListener),
+			Advertise:   b.stringVal(segment.Advertise),
+		})
+	}
+
 	// ----------------------------------------------------------------
 	// deprecated fields
 	//
@@ -588,6 +601,8 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		NonVotingServer:             b.boolVal(c.NonVotingServer),
 		PidFile:                     b.stringVal(c.PidFile),
 		RPCProtocol:                 b.intVal(c.RPCProtocol),
+		RPCRateLimit:                rate.Limit(b.float64Val(c.Limits.RPCRate)),
+		RPCMaxBurst:                 b.intVal(c.Limits.RPCMaxBurst),
 		RaftProtocol:                b.intVal(c.RaftProtocol),
 		ReconnectTimeoutLAN:         b.durationVal(c.ReconnectTimeoutLAN),
 		ReconnectTimeoutWAN:         b.durationVal(c.ReconnectTimeoutWAN),
@@ -598,6 +613,8 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		RetryJoinMaxAttemptsLAN:     b.intVal(c.RetryJoinMaxAttemptsLAN),
 		RetryJoinMaxAttemptsWAN:     b.intVal(c.RetryJoinMaxAttemptsWAN),
 		RetryJoinWAN:                c.RetryJoinWAN,
+		Segment:                     b.stringVal(c.Segment),
+		Segments:                    segments,
 		SerfAdvertiseAddrLAN:        serfAdvertiseAddrLAN,
 		SerfAdvertiseAddrWAN:        serfAdvertiseAddrWAN,
 		SerfBindAddrLAN:             serfBindAddrLAN,
@@ -734,6 +751,14 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 	}
 	if err := uniqueUsage("HTTPS", rt.HTTPSAddrs); err != nil {
 		return err
+	}
+
+	if rt.ServerMode && rt.Segment != "" {
+		return fmt.Errorf("Segment option can only be set on clients")
+	}
+
+	if !rt.ServerMode && len(rt.Segments) > 0 {
+		return fmt.Errorf("Segments can only be configured on servers")
 	}
 
 	return nil
@@ -888,6 +913,14 @@ func (b *Builder) stringVal(v *string) string {
 	if b.err != nil || v == nil {
 		return ""
 	}
+	return *v
+}
+
+func (b *Builder) float64Val(v *float64) float64 {
+	if b.err != nil || v == nil {
+		return 0
+	}
+
 	return *v
 }
 

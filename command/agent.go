@@ -389,15 +389,15 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 	// done: 	return nil
 	// done: }
 
-	if cfg.Server && cfg.Segment != "" {
-		cmd.UI.Error("Segment option can only be set on clients")
-		return nil
-	}
+	// done: if cfg.Server && cfg.Segment != "" {
+	// done: 	cmd.UI.Error("Segment option can only be set on clients")
+	// done: 	return nil
+	// done: }
 
-	if !cfg.Server && len(cfg.Segments) > 0 {
-		cmd.UI.Error("Segments can only be configured on servers")
-		return nil
-	}
+	// done: if !cfg.Server && len(cfg.Segments) > 0 {
+	// done: 	cmd.UI.Error("Segments can only be configured on servers")
+	// done: 	return nil
+	// done: }
 
 	// done: // patch deprecated retry-join-{gce,azure,ec2)-* parameters
 	// done: // into -retry-join and issue warning.

@@ -1469,6 +1469,10 @@ func TestFullConfig(t *testing.T) {
 			},
 			"key_file": "IEkkwgIA",
 			"leave_on_terminate": true,
+			"limits": {
+				"rpc_rate": 12029,
+				"rpc_max_burst": 44848
+			},
 			"log_level": "k1zo9Spt",
 			"node_id": "AsUIlw99",
 			"node_meta": {
@@ -1499,6 +1503,23 @@ func TestFullConfig(t *testing.T) {
 			"retry_join_wan": [ "PFsR02Ye", "rJdQIhER" ],
 			"retry_max": 913,
 			"retry_max_wan": 23160,
+			"segment": "",
+			"segments": [
+				{
+					"name": "PExYMe2E",
+					"bind": "glvbzk9Z",
+					"port": 38295,
+					"rpc_listener": true,
+					"advertise": "A72483Io"
+				},
+				{
+					"name": "UzCvJgup",
+					"bind": "ZEhIEdtJ",
+					"port": 39292,
+					"rpc_listener": true,
+					"advertise": "wHQJBv9R"
+				}
+			],
 			"serf_lan": "bdJGdMtR",
 			"serf_wan": "rSfygrZH",
 			"server": true,
@@ -1859,6 +1880,10 @@ func TestFullConfig(t *testing.T) {
 			}
 			key_file = "IEkkwgIA"
 			leave_on_terminate = true
+			limits {
+				//rpc_rate = 12029
+				rpc_max_burst = 44848
+			}
 			log_level = "k1zo9Spt"
 			node_id = "AsUIlw99"
 			node_meta {
@@ -1889,6 +1914,23 @@ func TestFullConfig(t *testing.T) {
 			retry_join_wan = [ "PFsR02Ye", "rJdQIhER" ]
 			retry_max = 913
 			retry_max_wan = 23160
+			segment = ""
+			segments = [
+				{
+					name = "PExYMe2E"
+					bind = "glvbzk9Z"
+					port = 38295
+					rpc_listener = true
+					advertise = "A72483Io"
+				},
+				{
+					name = "UzCvJgup"
+					bind = "ZEhIEdtJ"
+					port = 39292
+					rpc_listener = true
+					advertise = "wHQJBv9R"
+				}
+			]
 			serf_lan = "bdJGdMtR"
 			serf_wan = "rSfygrZH"
 			server = true
@@ -2246,6 +2288,8 @@ func TestFullConfig(t *testing.T) {
 		PerformanceRaftMultiplier: 22057,
 		PidFile:                   "43xN80Km",
 		RPCProtocol:               30793,
+		RPCRateLimit:              12029,
+		RPCMaxBurst:               44848,
 		RaftProtocol:              19016,
 		ReconnectTimeoutLAN:       23739 * time.Second,
 		ReconnectTimeoutWAN:       26694 * time.Second,
@@ -2256,8 +2300,25 @@ func TestFullConfig(t *testing.T) {
 		RetryJoinMaxAttemptsLAN:   913,
 		RetryJoinMaxAttemptsWAN:   23160,
 		RetryJoinWAN:              []string{"PFsR02Ye", "rJdQIhER"},
-		ServerMode:                true,
-		ServerName:                "Oerr9n1G",
+		Segment:                   "",
+		Segments: []structs.NetworkSegment{
+			{
+				Name:        "PExYMe2E",
+				Bind:        "glvbzk9Z",
+				Port:        38295,
+				RPCListener: true,
+				Advertise:   "A72483Io",
+			},
+			{
+				Name:        "UzCvJgup",
+				Bind:        "ZEhIEdtJ",
+				Port:        39292,
+				RPCListener: true,
+				Advertise:   "wHQJBv9R",
+			},
+		},
+		ServerMode: true,
+		ServerName: "Oerr9n1G",
 		Services: []*structs.ServiceDefinition{
 			{
 				ID:                "wI1dzxS4",

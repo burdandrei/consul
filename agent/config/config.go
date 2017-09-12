@@ -65,6 +65,7 @@ type Config struct {
 	HTTPConfig                  HTTPConfig           `json:"http_config" hcl:"http_config"`
 	KeyFile                     *string              `json:"key_file" hcl:"key_file"`
 	LeaveOnTerm                 *bool                `json:"leave_on_terminate" hcl:"leave_on_terminate"`
+	Limits                      Limits               `json:"limits" hcl:"limits"`
 	LogLevel                    *string              `json:"log_level" hcl:"log_level"`
 	NodeID                      *string              `json:"node_id" hcl:"node_id"`
 	NodeMeta                    map[string]string    `json:"node_meta" hcl:"node_meta"`
@@ -84,6 +85,8 @@ type Config struct {
 	RetryJoinMaxAttemptsLAN     *int                 `json:"retry_max" hcl:"retry_max"`
 	RetryJoinMaxAttemptsWAN     *int                 `json:"retry_max_wan" hcl:"retry_max_wan"`
 	RetryJoinWAN                []string             `json:"retry_join_wan" hcl:"retry_join_wan"`
+	Segment                     *string              `json:"segment" hcl:"segment"`
+	Segments                    []NetworkSegment     `json:"segments" hcl:"segments"`
 	SerfBindAddrLAN             *string              `json:"serf_lan" hcl:"serf_lan"`
 	SerfBindAddrWAN             *string              `json:"serf_wan" hcl:"serf_wan"`
 	ServerMode                  *bool                `json:"server" hcl:"server"`
@@ -271,4 +274,17 @@ type UnixSocket struct {
 	User  *string `json:"user" hcl:"user"`
 	Group *string `json:"group" hcl:"group"`
 	Mode  *string `json:"mode" hcl:"mode"`
+}
+
+type Limits struct {
+	RPCRate     *float64 `json:"rpc_rate" hcl:"rpc_rate"`
+	RPCMaxBurst *int     `json:"rpc_max_burst" hcl:"rpc_max_burst"`
+}
+
+type NetworkSegment struct {
+	Name        *string `json:"name" hcl:"name"`
+	Bind        *string `json:"bind" hcl:"bind"`
+	Port        *int    `json:"port" hcl:"port"`
+	RPCListener *bool   `json:"rpc_listener" hcl:"rpc_listener"`
+	Advertise   *string `json:"advertise" hcl:"advertise"`
 }

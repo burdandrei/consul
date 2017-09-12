@@ -223,3 +223,23 @@ type OperatorHealthReply struct {
 	// Servers holds the health of each server.
 	Servers []ServerHealth
 }
+
+// (Enterprise-only) NetworkSegment is the configuration for a network segment, which is an
+// isolated serf group on the LAN.
+type NetworkSegment struct {
+	// Name is the name of the segment.
+	Name string
+
+	// Bind is the bind address for this segment.
+	Bind string
+
+	// Port is the port for this segment.
+	Port int
+
+	// RPCListener is whether to bind a separate RPC listener on the bind address
+	// for this segment.
+	RPCListener bool
+
+	// Advertise is the advertise address of this segment.
+	Advertise string
+}
