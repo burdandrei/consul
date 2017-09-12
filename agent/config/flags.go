@@ -102,6 +102,7 @@ func AddFlags(fs *flag.FlagSet, f *Flags) {
 	add(&f.Config.RetryJoinMaxAttemptsLAN, "retry-max", "Maximum number of join attempts. Defaults to 0, which will retry indefinitely.")
 	add(&f.Config.RetryJoinMaxAttemptsWAN, "retry-max-wan", "Maximum number of join -wan attempts. Defaults to 0, which will retry indefinitely.")
 	add(&f.Config.SerfBindAddrLAN, "serf-lan-bind", "Address to bind Serf LAN listeners to.")
+	add(&f.Config.SegmentName, "segment", "(Enterprise-only) Sets the network segment to join.")
 	add(&f.Config.SerfBindAddrWAN, "serf-wan-bind", "Address to bind Serf WAN listeners to.")
 	add(&f.Config.ServerMode, "server", "Switches agent to server mode.")
 	add(&f.Config.EnableSyslog, "syslog", "Enables logging to syslog.")
