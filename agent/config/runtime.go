@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/agent/structs"
+	"github.com/hashicorp/consul/watch"
 	"golang.org/x/time/rate"
 )
 
@@ -136,6 +137,7 @@ type RuntimeConfig struct {
 	VerifyIncomingRPC           bool
 	VerifyOutgoing              bool
 	VerifyServerHostname        bool
+	WatchPlans                  []*watch.Plan
 
 	// address values
 

@@ -19,7 +19,6 @@ import (
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/lib"
 	"github.com/hashicorp/consul/logger"
-	"github.com/hashicorp/consul/watch"
 	"github.com/hashicorp/go-checkpoint"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/logutils"
@@ -476,24 +475,24 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 	// done: }
 
 	// Compile all the watches
-	for _, params := range cfg.Watches {
-		// Parse the watches, excluding the handler
-		wp, err := watch.ParseExempt(params, []string{"handler"})
-		if err != nil {
-			cmd.UI.Error(fmt.Sprintf("Failed to parse watch (%#v): %v", params, err))
-			return nil
-		}
+	// done: for _, params := range cfg.Watches {
+	// done: 	// Parse the watches, excluding the handler
+	// done: 	wp, err := watch.ParseExempt(params, []string{"handler"})
+	// done: 	if err != nil {
+	// done: 		cmd.UI.Error(fmt.Sprintf("Failed to parse watch (%#v): %v", params, err))
+	// done: 		return nil
+	// done: 	}
 
-		// Get the handler
-		h := wp.Exempt["handler"]
-		if _, ok := h.(string); h == nil || !ok {
-			cmd.UI.Error("Watch handler must be a string")
-			return nil
-		}
+	// done: 	// Get the handler
+	// done: 	h := wp.Exempt["handler"]
+	// done: 	if _, ok := h.(string); h == nil || !ok {
+	// done: 		cmd.UI.Error("Watch handler must be a string")
+	// done: 		return nil
+	// done: 	}
 
-		// Store the watch plan
-		cfg.WatchPlans = append(cfg.WatchPlans, wp)
-	}
+	// done: 	// Store the watch plan
+	// done: 	cfg.WatchPlans = append(cfg.WatchPlans, wp)
+	// done: }
 
 	// done: // Warn if we are in expect mode
 	// done: if cfg.BootstrapExpect == 1 {

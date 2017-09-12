@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/consul/ipaddr"
 	"github.com/hashicorp/consul/tlsutil"
 	"github.com/hashicorp/consul/types"
+	"github.com/hashicorp/consul/watch"
 	discover "github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-sockaddr/template"
 	"github.com/hashicorp/hcl"
@@ -484,9 +485,25 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		b.warn("config: retry_join_gce is deprecated. Please add %q to retry_join.", m)
 	}
 
-	// missing complex stuff
-	if c.Watches != nil {
-		panic("add me")
+	// Compile all the watches
+	var watchPlans []*watch.Plan
+	for _, params := range c.Watches {
+		// Parse the watches, excluding the handler
+		wp, err := watch.ParseExempt(params, []string{"handler"})
+		if err != nil {
+			b.err = fmt.Errorf("Failed to parse watch (%#v): %v", params, err)
+			panic(b.err)
+		}
+
+		// Get the handler
+		h := wp.Exempt["handler"]
+		if _, ok := h.(string); h == nil || !ok {
+			b.err = fmt.Errorf("Watch handler must be a string")
+			panic(b.err)
+		}
+
+		// Store the watch plan
+		watchPlans = append(watchPlans, wp)
 	}
 
 	// ----------------------------------------------------------------
@@ -641,6 +658,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		VerifyIncomingRPC:           b.boolVal(c.VerifyIncomingRPC),
 		VerifyOutgoing:              b.boolVal(c.VerifyOutgoing),
 		VerifyServerHostname:        b.boolVal(c.VerifyServerHostname),
+		WatchPlans:                  watchPlans,
 	}
 
 	if rt.BootstrapExpect == 1 {

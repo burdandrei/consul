@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/agent/structs"
+	"github.com/hashicorp/consul/watch"
 	"github.com/pascaldekloe/goe/verify"
 )
 
@@ -1470,7 +1471,7 @@ func TestFullConfig(t *testing.T) {
 			"key_file": "IEkkwgIA",
 			"leave_on_terminate": true,
 			"limits": {
-				"rpc_rate": 12029,
+				"rpc_rate": 12029.43,
 				"rpc_max_burst": 44848
 			},
 			"log_level": "k1zo9Spt",
@@ -1725,6 +1726,14 @@ func TestFullConfig(t *testing.T) {
 				"mode": "E8sAwOv4",
 				"user": "E0nB1DwA"
 			},
+			"watches": [
+				{
+					"type": "key",
+					"datacenter": "GyE6jpeW",
+					"key": "j9lF1Tve",
+					"handler": "90N7S4LN"
+				}
+			],
 			"verify_incoming": true,
 			"verify_incoming_https": true,
 			"verify_incoming_rpc": true,
@@ -1881,7 +1890,7 @@ func TestFullConfig(t *testing.T) {
 			key_file = "IEkkwgIA"
 			leave_on_terminate = true
 			limits {
-				//rpc_rate = 12029
+				rpc_rate = 12029.43
 				rpc_max_burst = 44848
 			}
 			log_level = "k1zo9Spt"
@@ -2136,6 +2145,12 @@ func TestFullConfig(t *testing.T) {
 				mode = "E8sAwOv4"
 				user = "E0nB1DwA"
 			}
+			watches = [{
+				type = "key"
+				datacenter = "GyE6jpeW"
+				key = "j9lF1Tve"
+				handler = "90N7S4LN"
+			}]
 			verify_incoming = true
 			verify_incoming_https = true
 			verify_incoming_rpc = true
@@ -2288,7 +2303,7 @@ func TestFullConfig(t *testing.T) {
 		PerformanceRaftMultiplier: 22057,
 		PidFile:                   "43xN80Km",
 		RPCProtocol:               30793,
-		RPCRateLimit:              12029,
+		RPCRateLimit:              12029.43,
 		RPCMaxBurst:               44848,
 		RaftProtocol:              19016,
 		ReconnectTimeoutLAN:       23739 * time.Second,
@@ -2524,6 +2539,12 @@ func TestFullConfig(t *testing.T) {
 		VerifyIncomingRPC:                           true,
 		VerifyOutgoing:                              true,
 		VerifyServerHostname:                        true,
+		WatchPlans: []*watch.Plan{
+			{
+				Type:       "key",
+				Datacenter: "GyE6jpeW",
+			},
+		},
 	}
 
 	warns := []string{
