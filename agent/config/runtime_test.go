@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/agent/structs"
-	"github.com/hashicorp/consul/watch"
 	"github.com/pascaldekloe/goe/verify"
 )
 
@@ -368,27 +367,27 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		{
 			desc:  "-atlas",
 			flags: []string{`-atlas`, `a`},
-			warns: []string{`'-atlas' is deprecated`},
-		},
-		{
-			desc:  "-atlas-join",
-			flags: []string{`-atlas-join`},
-			warns: []string{`'-atlas-join' is deprecated`},
+			warns: []string{`==> DEPRECATION: "-atlas" is deprecated. Please remove it from your configuration`},
 		},
 		{
 			desc:  "-atlas-endpoint",
 			flags: []string{`-atlas-endpoint`, `a`},
-			warns: []string{`'-atlas-endpoint' is deprecated`},
+			warns: []string{`==> DEPRECATION: "-atlas-endpoint" is deprecated. Please remove it from your configuration`},
+		},
+		{
+			desc:  "-atlas-join",
+			flags: []string{`-atlas-join`},
+			warns: []string{`==> DEPRECATION: "-atlas-join" is deprecated. Please remove it from your configuration`},
 		},
 		{
 			desc:  "-atlas-token",
 			flags: []string{`-atlas-token`, `a`},
-			warns: []string{`'-atlas-token' is deprecated`},
+			warns: []string{`==> DEPRECATION: "-atlas-token" is deprecated. Please remove it from your configuration`},
 		},
 		{
 			desc:  "-dc",
 			flags: []string{`-dc`, `a`},
-			warns: []string{`'-dc' is deprecated. Use '-datacenter' instead`},
+			warns: []string{`==> DEPRECATION: "-dc" is deprecated. Use "-datacenter" instead`},
 			patch: func(rt *RuntimeConfig) {
 				rt.Datacenter = "a"
 			},
@@ -399,7 +398,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.RetryJoinLAN = []string{"provider=azure tag_name=a"}
 			},
-			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_name=a" to retry_join.`},
+			warns: []string{`==> DEPRECATION: "retry_join_azure" is deprecated. Please add "provider=azure tag_name=a" to "retry_join".`},
 		},
 		{
 			desc:  "-retry-join-azure-tag-value",
@@ -407,7 +406,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.RetryJoinLAN = []string{"provider=azure tag_value=a"}
 			},
-			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure tag_value=a" to retry_join.`},
+			warns: []string{`==> DEPRECATION: "retry_join_azure" is deprecated. Please add "provider=azure tag_value=a" to "retry_join".`},
 		},
 		{
 			desc:  "-retry-join-ec2-region",
@@ -415,7 +414,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.RetryJoinLAN = []string{"provider=aws region=a"}
 			},
-			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws region=a" to retry_join.`},
+			warns: []string{`==> DEPRECATION: "retry_join_ec2" is deprecated. Please add "provider=aws region=a" to "retry_join".`},
 		},
 		{
 			desc:  "-retry-join-ec2-tag-key",
@@ -423,7 +422,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.RetryJoinLAN = []string{"provider=aws tag_key=a"}
 			},
-			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_key=a" to retry_join.`},
+			warns: []string{`==> DEPRECATION: "retry_join_ec2" is deprecated. Please add "provider=aws tag_key=a" to "retry_join".`},
 		},
 		{
 			desc:  "-retry-join-ec2-tag-value",
@@ -431,7 +430,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.RetryJoinLAN = []string{"provider=aws tag_value=a"}
 			},
-			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws tag_value=a" to retry_join.`},
+			warns: []string{`==> DEPRECATION: "retry_join_ec2" is deprecated. Please add "provider=aws tag_value=a" to "retry_join".`},
 		},
 		{
 			desc:  "-retry-join-gce-credentials-file",
@@ -439,7 +438,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.RetryJoinLAN = []string{"provider=gce credentials_file=a"}
 			},
-			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden" to retry_join.`},
+			warns: []string{`==> DEPRECATION: "retry_join_gce" is deprecated. Please add "provider=gce credentials_file=hidden" to "retry_join".`},
 		},
 		{
 			desc:  "-retry-join-gce-project-name",
@@ -447,7 +446,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.RetryJoinLAN = []string{"provider=gce project_name=a"}
 			},
-			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce project_name=a" to retry_join.`},
+			warns: []string{`==> DEPRECATION: "retry_join_gce" is deprecated. Please add "provider=gce project_name=a" to "retry_join".`},
 		},
 		{
 			desc:  "-retry-join-gce-tag-value",
@@ -455,7 +454,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.RetryJoinLAN = []string{"provider=gce tag_value=a"}
 			},
-			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce tag_value=a" to retry_join.`},
+			warns: []string{`==> DEPRECATION: "retry_join_gce" is deprecated. Please add "provider=gce tag_value=a" to "retry_join".`},
 		},
 		{
 			desc:  "-retry-join-gce-zone-pattern",
@@ -463,7 +462,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.RetryJoinLAN = []string{"provider=gce zone_pattern=a"}
 			},
-			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce zone_pattern=a" to retry_join.`},
+			warns: []string{`==> DEPRECATION: "retry_join_gce" is deprecated. Please add "provider=gce zone_pattern=a" to "retry_join".`},
 		},
 
 		// ------------------------------------------------------------
@@ -471,13 +470,25 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		//
 
 		{
+			desc:  "addresses.rpc",
+			json:  []string{`{"addresses":{ "rpc": "a" }}`},
+			hcl:   []string{`addresses = { rpc = "a" }`},
+			warns: []string{`==> DEPRECATION: "addresses.rpc" is deprecated and is no longer used. Please remove it from your configuration.`},
+		},
+		{
+			desc:  "ports.rpc",
+			json:  []string{`{"ports":{ "rpc": 123 }}`},
+			hcl:   []string{`ports = { rpc = 123 }`},
+			warns: []string{`==> DEPRECATION: "ports.rpc" is deprecated and is no longer used. Please remove it from your configuration.`},
+		},
+		{
 			desc: "check.service_id alias",
 			json: []string{`{"check":{ "service_id":"d", "serviceid":"dd" }}`},
 			hcl:  []string{`check = { service_id="d" serviceid="dd" }`},
 			patch: func(rt *RuntimeConfig) {
 				rt.Checks = []*structs.CheckDefinition{{ServiceID: "dd"}}
 			},
-			warns: []string{`config: "serviceid" is deprecated in check definitions. Please use "service_id" instead.`},
+			warns: []string{`==> DEPRECATION: "serviceid" is deprecated in check definitions. Please use "service_id" instead.`},
 		},
 		{
 			desc: "check.docker_container_id alias",
@@ -486,7 +497,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.Checks = []*structs.CheckDefinition{{DockerContainerID: "kk"}}
 			},
-			warns: []string{`config: "dockercontainerid" is deprecated in check definitions. Please use "docker_container_id" instead.`},
+			warns: []string{`==> DEPRECATION: "dockercontainerid" is deprecated in check definitions. Please use "docker_container_id" instead.`},
 		},
 		{
 			desc: "check.tls_skip_verify alias",
@@ -495,7 +506,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.Checks = []*structs.CheckDefinition{{TLSSkipVerify: false}}
 			},
-			warns: []string{`config: "tlsskipverify" is deprecated in check definitions. Please use "tls_skip_verify" instead.`},
+			warns: []string{`==> DEPRECATION: "tlsskipverify" is deprecated in check definitions. Please use "tls_skip_verify" instead.`},
 		},
 		{
 			desc: "check.deregister_critical_service_after alias",
@@ -504,7 +515,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.Checks = []*structs.CheckDefinition{{DeregisterCriticalServiceAfter: 10 * time.Second}}
 			},
-			warns: []string{`config: "deregistercriticalserviceafter" is deprecated in check definitions. Please use "deregister_critical_service_after" instead.`},
+			warns: []string{`==> DEPRECATION: "deregistercriticalserviceafter" is deprecated in check definitions. Please use "deregister_critical_service_after" instead.`},
 		},
 		{
 			desc: "http_api_response_headers",
@@ -513,7 +524,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.HTTPResponseHeaders = map[string]string{"a": "b", "c": "d"}
 			},
-			warns: []string{`config: "http_api_response_headers" is deprecated. Please use "http_config.response_headers" instead.`},
+			warns: []string{`==> DEPRECATION: "http_api_response_headers" is deprecated. Please use "http_config.response_headers" instead.`},
 		},
 		{
 			desc: "retry_join_azure",
@@ -540,7 +551,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.RetryJoinLAN = []string{"provider=azure client_id=e secret_access_key=f subscription_id=c tag_name=a tag_value=b tenant_id=d"}
 			},
-			warns: []string{`config: retry_join_azure is deprecated. Please add "provider=azure client_id=hidden secret_access_key=hidden subscription_id=hidden tag_name=a tag_value=b tenant_id=hidden" to retry_join.`},
+			warns: []string{`==> DEPRECATION: "retry_join_azure" is deprecated. Please add "provider=azure client_id=hidden secret_access_key=hidden subscription_id=hidden tag_name=a tag_value=b tenant_id=hidden" to "retry_join".`},
 		},
 		{
 			desc: "retry_join_ec2",
@@ -565,7 +576,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.RetryJoinLAN = []string{"provider=aws access_key_id=d region=c secret_access_key=e tag_key=a tag_value=b"}
 			},
-			warns: []string{`config: retry_join_ec2 is deprecated. Please add "provider=aws access_key_id=hidden region=c secret_access_key=hidden tag_key=a tag_value=b" to retry_join.`},
+			warns: []string{`==> DEPRECATION: "retry_join_ec2" is deprecated. Please add "provider=aws access_key_id=hidden region=c secret_access_key=hidden tag_key=a tag_value=b" to "retry_join".`},
 		},
 		{
 			desc: "retry_join_gce",
@@ -588,14 +599,14 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.RetryJoinLAN = []string{"provider=gce credentials_file=d project_name=a tag_value=c zone_pattern=b"}
 			},
-			warns: []string{`config: retry_join_gce is deprecated. Please add "provider=gce credentials_file=hidden project_name=a tag_value=c zone_pattern=b" to retry_join.`},
+			warns: []string{`==> DEPRECATION: "retry_join_gce" is deprecated. Please add "provider=gce credentials_file=hidden project_name=a tag_value=c zone_pattern=b" to "retry_join".`},
 		},
 
 		{
 			desc:  "telemetry.dogstatsd_addr alias",
 			json:  []string{`{"dogstatsd_addr":"a", "telemetry":{"dogstatsd_addr": "b"}}`},
 			hcl:   []string{`dogstatsd_addr = "a" telemetry = { dogstatsd_addr = "b"}`},
-			warns: []string{`config: "dogstatsd_addr" is deprecated. Please use "telemetry.dogstatsd_addr" instead.`},
+			warns: []string{`==> DEPRECATION: "dogstatsd_addr" is deprecated. Please use "telemetry.dogstatsd_addr" instead.`},
 			patch: func(rt *RuntimeConfig) {
 				rt.TelemetryDogstatsdAddr = "a"
 			},
@@ -604,7 +615,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			desc:  "telemetry.dogstatsd_tags alias",
 			json:  []string{`{"dogstatsd_tags":["a", "b"], "telemetry": { "dogstatsd_tags": ["c", "d"]}}`},
 			hcl:   []string{`dogstatsd_tags = ["a", "b"] telemetry = { dogstatsd_tags = ["c", "d"] }`},
-			warns: []string{`config: "dogstatsd_tags" is deprecated. Please use "telemetry.dogstatsd_tags" instead.`},
+			warns: []string{`==> DEPRECATION: "dogstatsd_tags" is deprecated. Please use "telemetry.dogstatsd_tags" instead.`},
 			patch: func(rt *RuntimeConfig) {
 				rt.TelemetryDogstatsdTags = []string{"a", "b", "c", "d"}
 			},
@@ -613,7 +624,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			desc:  "telemetry.statsd_addr alias",
 			json:  []string{`{"statsd_addr":"a", "telemetry":{"statsd_addr": "b"}}`},
 			hcl:   []string{`statsd_addr = "a" telemetry = { statsd_addr = "b" }`},
-			warns: []string{`config: "statsd_addr" is deprecated. Please use "telemetry.statsd_addr" instead.`},
+			warns: []string{`==> DEPRECATION: "statsd_addr" is deprecated. Please use "telemetry.statsd_addr" instead.`},
 			patch: func(rt *RuntimeConfig) {
 				rt.TelemetryStatsdAddr = "a"
 			},
@@ -622,7 +633,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			desc:  "telemetry.statsite_addr alias",
 			json:  []string{`{"statsite_addr":"a", "telemetry":{ "statsite_addr": "b" }}`},
 			hcl:   []string{`statsite_addr = "a" telemetry = { statsite_addr = "b"}`},
-			warns: []string{`config: "statsite_addr" is deprecated. Please use "telemetry.statsite_addr" instead.`},
+			warns: []string{`==> DEPRECATION: "statsite_addr" is deprecated. Please use "telemetry.statsite_addr" instead.`},
 			patch: func(rt *RuntimeConfig) {
 				rt.TelemetryStatsiteAddr = "a"
 			},
@@ -631,7 +642,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			desc:  "telemetry.statsite_prefix alias",
 			json:  []string{`{"statsite_prefix":"a", "telemetry":{ "statsite_prefix": "b" }}`},
 			hcl:   []string{`statsite_prefix = "a" telemetry = { statsite_prefix = "b" }`},
-			warns: []string{`config: "statsite_prefix" is deprecated. Please use "telemetry.statsite_prefix" instead.`},
+			warns: []string{`==> DEPRECATION: "statsite_prefix" is deprecated. Please use "telemetry.statsite_prefix" instead.`},
 			patch: func(rt *RuntimeConfig) {
 				rt.TelemetryStatsitePrefix = "a"
 			},
@@ -1261,9 +1272,11 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 
 				// read the source fragements
 				for _, src := range srcs {
-					if err := b.ReadBytes([]byte(src), format); err != nil {
-						t.Fatalf("ReadBytes failed for %q: %s", src, err)
+					c, err := ParseConfig([]byte(src), format)
+					if err != nil {
+						t.Fatalf("ParseConfig failed for %q: %s", src, err)
 					}
+					b.Configs = append(b.Configs, c)
 				}
 
 				// build/merge the config fragments
@@ -1319,7 +1332,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 //   random-string 8
 //
 func TestFullConfig(t *testing.T) {
-	flagSrc := []string{}
+	flagSrc := []string{`-dev`}
 	src := map[string]string{
 		"json": `{
 			"acl_agent_master_token": "furuQD0b",
@@ -1335,11 +1348,13 @@ func TestFullConfig(t *testing.T) {
 			"addresses": {
 				"dns": "kEtdOtsn",
 				"http": "uCOhLXzi",
-				"https": "z4j7tmn2"
+				"https": "z4j7tmn2",
+				"rpc": "ZIkSmEPN"
 			},
 			"advertise_addr": "zkCS5pci",
 			"advertise_addr_wan": "587rk4R8",
 			"advertise_addrs": {
+				"rpc": "6dJYROsv",
 				"serf_lan": "XPYfEKBY",
 				"serf_wan": "53wnhkCC"
 			},
@@ -1353,7 +1368,7 @@ func TestFullConfig(t *testing.T) {
 				"upgrade_version_tag": "W9pDwFAL"
 			},
 			"bind_addr": "6rFPKyh6",
-			"bootstrap": false,
+			"bootstrap": true,
 			"bootstrap_expect": 53,
 			"ca_file": "erA7T0PM",
 			"ca_path": "mQEN1Mfp",
@@ -1457,7 +1472,7 @@ func TestFullConfig(t *testing.T) {
 			"enable_debug": true,
 			"enable_script_checks": true,
 			"enable_syslog": true,
-			"enable_ui": false,
+			"enable_ui": true,
 			"encrypt": "A4wELWqH",
 			"encrypt_verify_incoming": true,
 			"encrypt_verify_outgoing": true,
@@ -1489,7 +1504,8 @@ func TestFullConfig(t *testing.T) {
 			"ports": {
 				"dns": 7001,
 				"http": 7999,
-				"https": 15127
+				"https": 15127,
+				"rpc": 10664
 			},
 			"protocol": 30793,
 			"raft_protocol": 19016,
@@ -1504,7 +1520,7 @@ func TestFullConfig(t *testing.T) {
 			"retry_join_wan": [ "PFsR02Ye", "rJdQIhER" ],
 			"retry_max": 913,
 			"retry_max_wan": 23160,
-			"segment": "",
+			"segment": "BC2NhTDi",
 			"segments": [
 				{
 					"name": "PExYMe2E",
@@ -1726,6 +1742,11 @@ func TestFullConfig(t *testing.T) {
 				"mode": "E8sAwOv4",
 				"user": "E0nB1DwA"
 			},
+			"verify_incoming": true,
+			"verify_incoming_https": true,
+			"verify_incoming_rpc": true,
+			"verify_outgoing": true,
+			"verify_server_hostname": true,
 			"watches": [
 				{
 					"type": "key",
@@ -1733,12 +1754,7 @@ func TestFullConfig(t *testing.T) {
 					"key": "j9lF1Tve",
 					"handler": "90N7S4LN"
 				}
-			],
-			"verify_incoming": true,
-			"verify_incoming_https": true,
-			"verify_incoming_rpc": true,
-			"verify_outgoing": true,
-			"verify_server_hostname": true
+			]
 		}`,
 		"hcl": `
 			acl_agent_master_token = "furuQD0b"
@@ -1755,10 +1771,12 @@ func TestFullConfig(t *testing.T) {
 				dns = "kEtdOtsn"
 				http = "uCOhLXzi"
 				https = "z4j7tmn2"
+				rpc = "ZIkSmEPN"
 			}
 			advertise_addr = "zkCS5pci"
 			advertise_addr_wan = "587rk4R8"
 			advertise_addrs = {
+				rpc = "6dJYROsv"
 				serf_lan = "XPYfEKBY"
 				serf_wan = "53wnhkCC"
 			}
@@ -1772,7 +1790,7 @@ func TestFullConfig(t *testing.T) {
 				upgrade_version_tag = "W9pDwFAL"
 			}
 			bind_addr = "6rFPKyh6"
-			bootstrap = false
+			bootstrap = true
 			bootstrap_expect = 53
 			ca_file = "erA7T0PM"
 			ca_path = "mQEN1Mfp"
@@ -1876,7 +1894,7 @@ func TestFullConfig(t *testing.T) {
 			enable_debug = true
 			enable_script_checks = true
 			enable_syslog = true
-			enable_ui = false
+			enable_ui = true
 			encrypt = "A4wELWqH"
 			encrypt_verify_incoming = true
 			encrypt_verify_outgoing = true
@@ -1909,6 +1927,7 @@ func TestFullConfig(t *testing.T) {
 				dns = 7001,
 				http = 7999,
 				https = 15127
+				rpc = 10664
 			}
 			protocol = 30793
 			raft_protocol = 19016
@@ -1923,7 +1942,7 @@ func TestFullConfig(t *testing.T) {
 			retry_join_wan = [ "PFsR02Ye", "rJdQIhER" ]
 			retry_max = 913
 			retry_max_wan = 23160
-			segment = ""
+			segment = "BC2NhTDi"
 			segments = [
 				{
 					name = "PExYMe2E"
@@ -2145,20 +2164,43 @@ func TestFullConfig(t *testing.T) {
 				mode = "E8sAwOv4"
 				user = "E0nB1DwA"
 			}
+			verify_incoming = true
+			verify_incoming_https = true
+			verify_incoming_rpc = true
+			verify_outgoing = true
+			verify_server_hostname = true
 			watches = [{
 				type = "key"
 				datacenter = "GyE6jpeW"
 				key = "j9lF1Tve"
 				handler = "90N7S4LN"
 			}]
-			verify_incoming = true
-			verify_incoming_https = true
-			verify_incoming_rpc = true
-			verify_outgoing = true
-			verify_server_hostname = true
 		`}
 
+	defaultRuntime := RuntimeConfig{
+		ACLDisabledTTL:             957 * time.Second,
+		CheckDeregisterIntervalMin: 27870 * time.Minute,
+		CheckReapInterval:          10662 * time.Second,
+		AEInterval:                 10003 * time.Minute,
+		SyncCoordinateRateTarget:   137.81,
+		SyncCoordinateIntervalMin:  27983 * time.Second,
+	}
+
 	want := RuntimeConfig{
+		// non-user configurable values
+		ACLDisabledTTL:             957 * time.Second,
+		CheckDeregisterIntervalMin: 27870 * time.Minute,
+		CheckReapInterval:          10662 * time.Second,
+		AEInterval:                 10003 * time.Minute,
+		SyncCoordinateRateTarget:   137.81,
+		SyncCoordinateIntervalMin:  27983 * time.Second,
+
+		Revision:          "JNtPSav3",
+		Version:           "R909Hblt",
+		VersionPrerelease: "ZT1JOQLn",
+
+		// user configurable values
+
 		ACLAgentMasterToken:              "furuQD0b",
 		ACLAgentToken:                    "cOshLOQ2",
 		ACLDatacenter:                    "m3urck3z",
@@ -2179,7 +2221,7 @@ func TestFullConfig(t *testing.T) {
 		AutopilotServerStabilizationTime: 23057 * time.Second,
 		AutopilotUpgradeVersionTag:       "W9pDwFAL",
 		BindAddrs:                        []string{"6rFPKyh6"},
-		Bootstrap:                        false,
+		Bootstrap:                        true,
 		BootstrapExpect:                  53,
 		CAFile:                           "erA7T0PM",
 		CAPath:                           "mQEN1Mfp",
@@ -2272,7 +2314,7 @@ func TestFullConfig(t *testing.T) {
 		DNSUDPAnswerLimit:         29909,
 		DataDir:                   "oTOOIoV9",
 		Datacenter:                "rzo029wg",
-		DevMode:                   false,
+		DevMode:                   true,
 		DisableAnonymousSignature: true,
 		DisableCoordinates:        true,
 		DisableHostNodeID:         true,
@@ -2283,7 +2325,7 @@ func TestFullConfig(t *testing.T) {
 		EnableDebug:               true,
 		EnableScriptChecks:        true,
 		EnableSyslog:              true,
-		EnableUI:                  false,
+		EnableUI:                  true,
 		EncryptKey:                "A4wELWqH",
 		EncryptVerifyIncoming:     true,
 		EncryptVerifyOutgoing:     true,
@@ -2302,6 +2344,7 @@ func TestFullConfig(t *testing.T) {
 		NonVotingServer:           true,
 		PerformanceRaftMultiplier: 22057,
 		PidFile:                   "43xN80Km",
+		RPCAdvertiseAddr:          "6dJYROsv",
 		RPCProtocol:               30793,
 		RPCRateLimit:              12029.43,
 		RPCMaxBurst:               44848,
@@ -2315,7 +2358,7 @@ func TestFullConfig(t *testing.T) {
 		RetryJoinMaxAttemptsLAN:   913,
 		RetryJoinMaxAttemptsWAN:   23160,
 		RetryJoinWAN:              []string{"PFsR02Ye", "rJdQIhER"},
-		Segment:                   "",
+		SegmentName:               "BC2NhTDi",
 		Segments: []structs.NetworkSegment{
 			{
 				Name:        "PExYMe2E",
@@ -2539,26 +2582,36 @@ func TestFullConfig(t *testing.T) {
 		VerifyIncomingRPC:                           true,
 		VerifyOutgoing:                              true,
 		VerifyServerHostname:                        true,
-		WatchPlans: []*watch.Plan{
-			{
-				Type:       "key",
-				Datacenter: "GyE6jpeW",
+		Watches: []map[string]interface{}{
+			map[string]interface{}{
+				"type":       "key",
+				"datacenter": "GyE6jpeW",
+				"key":        "j9lF1Tve",
+				"handler":    "90N7S4LN",
 			},
 		},
 	}
 
 	warns := []string{
-		"BootstrapExpect mode enabled, expecting 53 servers",
+		`==> DEPRECATION: "addresses.rpc" is deprecated and is no longer used. Please remove it from your configuration.`,
+		`==> DEPRECATION: "ports.rpc" is deprecated and is no longer used. Please remove it from your configuration.`,
+		`BootstrapExpect mode enabled, expecting 53 servers`,
 	}
 
 	// ensure that all fields are set to unique non-zero values
 	// todo(fs): This currently fails since ServiceDefinition.Check is not used
-	// if err := nonZero("RuntimeConfig", nil, want); err != nil {
-	// t.Fatal(err)
-	// }
+	// todo(fs): not sure on how to work around this. Possible options are:
+	// todo(fs):  * move first check into the Check field
+	// todo(fs):  * ignore the Check field
+	// todo(fs): both feel like a hack
+	if err := nonZero("RuntimeConfig", nil, want); err != nil {
+		t.Log(err)
+	}
 
 	for format, s := range src {
 		t.Run(format, func(t *testing.T) {
+			// parse the flags since this is the only way we can set the
+			// DevMode flag
 			var flags Flags
 			fs := flag.NewFlagSet("", flag.ContinueOnError)
 			AddFlags(fs, &flags)
@@ -2566,26 +2619,55 @@ func TestFullConfig(t *testing.T) {
 				t.Fatalf("ParseFlags: %s", err)
 			}
 
+			// parse the config
+			c, err := ParseConfig([]byte(s), format)
+			if err != nil {
+				t.Fatalf("ParseConfig: %s", err)
+			}
+
 			// ensure that all fields are set to unique non-zero values
-			// if err := nonZero("Config", nil, cfg); err != nil {
-			// t.Fatal(err)
+			// if err := nonZero("Config", nil, c); err != nil {
+			// 	t.Fatal(err)
 			// }
 
-			b := &Builder{Flags: flags, Default: &Config{}}
-			if err := b.ReadBytes([]byte(s), format); err != nil {
-				t.Fatalf("ReadBytes: %s", err)
+			b := &Builder{
+				Flags:             flags,
+				Default:           &defaultConfig,
+				DefaultRuntime:    defaultRuntime,
+				Revision:          "JNtPSav3",
+				Version:           "R909Hblt",
+				VersionPrerelease: "ZT1JOQLn",
+				Configs:           []Config{c},
 			}
+
+			// construct the runtime config
 			rt, err := b.Build()
 			if err != nil {
 				t.Fatalf("Build: %s", err)
 			}
+
+			// verify that all fields are set
+			if !verify.Values(t, "", rt, want) {
+				t.FailNow()
+			}
+
+			// at this point we have confirmed that the parsing worked
+			// for all fields but the validation will fail since certain
+			// combinations are not allowed. Since it is not possible to have
+			// all fields with non-zero values and to have a valid configuration
+			// we are patching a handful of safe fields to make validation pass.
+			rt.Bootstrap = false
+			rt.DevMode = false
+			rt.EnableUI = false
+			rt.SegmentName = ""
+
+			// validate the runtime config
 			if err := b.Validate(rt); err != nil {
 				t.Fatalf("Validate: %s", err)
 			}
+
+			// check the warnings
 			if got, want := b.Warnings, warns; !verify.Values(t, "warnings", got, want) {
-				t.FailNow()
-			}
-			if !verify.Values(t, "", rt, want) {
 				t.FailNow()
 			}
 		})

@@ -1,120 +1,151 @@
 package config
 
-// Config defines the format of a configuration file in either JSON or HCL
-// format.
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"strings"
+
+	"github.com/hashicorp/hcl"
+)
+
+// ParseFile reads a JSON or HCL config file.
+func ParseFile(name string) (Config, error) {
+	format := "json"
+	if strings.HasSuffix(name, ".hcl") {
+		format = "hcl"
+	}
+	data, err := ioutil.ReadFile(name)
+	if err != nil {
+		return Config{}, fmt.Errorf("config: Error reading %s: %s", name, err)
+	}
+	return ParseConfig(data, format)
+}
+
+// ParseConfig parses a config fragment in either JSON or HCL format.
+func ParseConfig(data []byte, format string) (c Config, err error) {
+	switch format {
+	case "json":
+		err = json.Unmarshal(data, &c)
+	case "hcl":
+		err = hcl.Decode(&c, string(data))
+	default:
+		err = fmt.Errorf("invalid format: %s", format)
+	}
+	return
+}
+
+// Config defines the format of a configuration file in either JSON or
+// HCL format.
 //
 // It must contain only pointer values, slices and maps to support
 // standardized merging of multiple Config structs into one.
 //
-// Since this is the format which users use to specify their configuration
-// it should be treated as an external API which cannot be changed and
-// refactored at will since this will break existing setups.
+// Since this is the format which users use to specify their
+// configuration it should be treated as an external API which cannot be
+// changed and refactored at will since this will break existing setups.
 type Config struct {
-	// todo(fs): where is this set/used?
-	// todo(fs): these are values in the default config which are not configurable.
-	// ACLDisabledTTL             *time.Duration       `json:"-" hcl:"-"`
-	// AEInterval                 *time.Duration       `json:"-" hcl:"-"`
-	// CheckDeregisterIntervalMin *time.Duration       `json:"-" hcl:"-"`
-	// CheckReapInterval          *time.Duration       `json:"-" hcl:"-"`
+	ACLAgentMasterToken         *string                  `json:"acl_agent_master_token" hcl:"acl_agent_master_token"`
+	ACLAgentToken               *string                  `json:"acl_agent_token" hcl:"acl_agent_token"`
+	ACLDatacenter               *string                  `json:"acl_datacenter" hcl:"acl_datacenter"`
+	ACLDefaultPolicy            *string                  `json:"acl_default_policy" hcl:"acl_default_policy"`
+	ACLDownPolicy               *string                  `json:"acl_down_policy" hcl:"acl_down_policy"`
+	ACLEnforceVersion8          *bool                    `json:"acl_enforce_version_8" hcl:"acl_enforce_version_8"`
+	ACLMasterToken              *string                  `json:"acl_master_token" hcl:"acl_master_token"`
+	ACLReplicationToken         *string                  `json:"acl_replication_token" hcl:"acl_replication_token"`
+	ACLTTL                      *string                  `json:"acl_ttl" hcl:"acl_ttl"`
+	ACLToken                    *string                  `json:"acl_token" hcl:"acl_token"`
+	Addresses                   Addresses                `json:"addresses" hcl:"addresses"`
+	AdvertiseAddrLAN            *string                  `json:"advertise_addr" hcl:"advertise_addr"`
+	AdvertiseAddrWAN            *string                  `json:"advertise_addr_wan" hcl:"advertise_addr_wan"`
+	AdvertiseAddrs              AdvertiseAddrsConfig     `json:"advertise_addrs" hcl:"advertise_addrs"`
+	Autopilot                   Autopilot                `json:"autopilot" hcl:"autopilot"`
+	BindAddr                    *string                  `json:"bind_addr" hcl:"bind_addr"`
+	Bootstrap                   *bool                    `json:"bootstrap" hcl:"bootstrap"`
+	BootstrapExpect             *int                     `json:"bootstrap_expect" hcl:"bootstrap_expect"`
+	CAFile                      *string                  `json:"ca_file" hcl:"ca_file"`
+	CAPath                      *string                  `json:"ca_path" hcl:"ca_path"`
+	CertFile                    *string                  `json:"cert_file" hcl:"cert_file"`
+	Check                       *CheckDefinition         `json:"check" hcl:"check"` // needs to be a pointer to avoid partial merges
+	CheckUpdateInterval         *string                  `json:"check_update_interval" hcl:"check_update_interval"`
+	Checks                      []CheckDefinition        `json:"checks" hcl:"checks"`
+	ClientAddr                  *string                  `json:"client_addr" hcl:"client_addr"`
+	DNS                         DNS                      `json:"dns_config" hcl:"dns_config"`
+	DNSDomain                   *string                  `json:"domain" hcl:"domain"`
+	DNSRecursor                 *string                  `json:"recursor" hcl:"recursor"`
+	DNSRecursors                []string                 `json:"recursors" hcl:"recursors"`
+	DataDir                     *string                  `json:"data_dir" hcl:"data_dir"`
+	Datacenter                  *string                  `json:"datacenter" hcl:"datacenter"`
+	DisableAnonymousSignature   *bool                    `json:"disable_anonymous_signature" hcl:"disable_anonymous_signature"`
+	DisableCoordinates          *bool                    `json:"disable_coordinates" hcl:"disable_coordinates"`
+	DisableHostNodeID           *bool                    `json:"disable_host_node_id" hcl:"disable_host_node_id"`
+	DisableKeyringFile          *bool                    `json:"disable_keyring_file" hcl:"disable_keyring_file"`
+	DisableRemoteExec           *bool                    `json:"disable_remote_exec" hcl:"disable_remote_exec"`
+	DisableUpdateCheck          *bool                    `json:"disable_update_check" hcl:"disable_update_check"`
+	EnableACLReplication        *bool                    `json:"enable_acl_replication" hcl:"enable_acl_replication"`
+	EnableDebug                 *bool                    `json:"enable_debug" hcl:"enable_debug"`
+	EnableScriptChecks          *bool                    `json:"enable_script_checks" hcl:"enable_script_checks"`
+	EnableSyslog                *bool                    `json:"enable_syslog" hcl:"enable_syslog"`
+	EnableUI                    *bool                    `json:"enable_ui" hcl:"enable_ui"`
+	EncryptKey                  *string                  `json:"encrypt" hcl:"encrypt"`
+	EncryptVerifyIncoming       *bool                    `json:"encrypt_verify_incoming" hcl:"encrypt_verify_incoming"`
+	EncryptVerifyOutgoing       *bool                    `json:"encrypt_verify_outgoing" hcl:"encrypt_verify_outgoing"`
+	HTTPConfig                  HTTPConfig               `json:"http_config" hcl:"http_config"`
+	KeyFile                     *string                  `json:"key_file" hcl:"key_file"`
+	LeaveOnTerm                 *bool                    `json:"leave_on_terminate" hcl:"leave_on_terminate"`
+	Limits                      Limits                   `json:"limits" hcl:"limits"`
+	LogLevel                    *string                  `json:"log_level" hcl:"log_level"`
+	NodeID                      *string                  `json:"node_id" hcl:"node_id"`
+	NodeMeta                    map[string]string        `json:"node_meta" hcl:"node_meta"`
+	NodeName                    *string                  `json:"node_name" hcl:"node_name"`
+	NonVotingServer             *bool                    `json:"non_voting_server" hcl:"non_voting_server"`
+	Performance                 Performance              `json:"performance" hcl:"performance"`
+	PidFile                     *string                  `json:"pid_file" hcl:"pid_file"`
+	Ports                       Ports                    `json:"ports" hcl:"ports"`
+	RPCProtocol                 *int                     `json:"protocol" hcl:"protocol"`
+	RaftProtocol                *int                     `json:"raft_protocol" hcl:"raft_protocol"`
+	ReconnectTimeoutLAN         *string                  `json:"reconnect_timeout" hcl:"reconnect_timeout"`
+	ReconnectTimeoutWAN         *string                  `json:"reconnect_timeout_wan" hcl:"reconnect_timeout_wan"`
+	RejoinAfterLeave            *bool                    `json:"rejoin_after_leave" hcl:"rejoin_after_leave"`
+	RetryJoinIntervalLAN        *string                  `json:"retry_interval" hcl:"retry_interval"`
+	RetryJoinIntervalWAN        *string                  `json:"retry_interval_wan" hcl:"retry_interval_wan"`
+	RetryJoinLAN                []string                 `json:"retry_join" hcl:"retry_join"`
+	RetryJoinMaxAttemptsLAN     *int                     `json:"retry_max" hcl:"retry_max"`
+	RetryJoinMaxAttemptsWAN     *int                     `json:"retry_max_wan" hcl:"retry_max_wan"`
+	RetryJoinWAN                []string                 `json:"retry_join_wan" hcl:"retry_join_wan"`
+	SegmentName                 *string                  `json:"segment" hcl:"segment"`
+	Segments                    []Segment                `json:"segments" hcl:"segments"`
+	SerfBindAddrLAN             *string                  `json:"serf_lan" hcl:"serf_lan"`
+	SerfBindAddrWAN             *string                  `json:"serf_wan" hcl:"serf_wan"`
+	ServerMode                  *bool                    `json:"server" hcl:"server"`
+	ServerName                  *string                  `json:"server_name" hcl:"server_name"`
+	Service                     *ServiceDefinition       `json:"service" hcl:"service"`
+	Services                    []ServiceDefinition      `json:"services" hcl:"services"`
+	SessionTTLMin               *string                  `json:"session_ttl_min" hcl:"session_ttl_min"`
+	SkipLeaveOnInt              *bool                    `json:"skip_leave_on_interrupt" hcl:"skip_leave_on_interrupt"`
+	StartJoinAddrsLAN           []string                 `json:"start_join" hcl:"start_join"`
+	StartJoinAddrsWAN           []string                 `json:"start_join_wan" hcl:"start_join_wan"`
+	SyslogFacility              *string                  `json:"syslog_facility" hcl:"syslog_facility"`
+	TLSCipherSuites             *string                  `json:"tls_cipher_suites" hcl:"tls_cipher_suites"`
+	TLSMinVersion               *string                  `json:"tls_min_version" hcl:"tls_min_version"`
+	TLSPreferServerCipherSuites *bool                    `json:"tls_prefer_server_cipher_suites" hcl:"tls_prefer_server_cipher_suites"`
+	TaggedAddresses             map[string]string        `json:"tagged_addresses" hcl:"tagged_addresses"`
+	Telemetry                   Telemetry                `json:"telemetry" hcl:"telemetry"`
+	TranslateWANAddrs           *bool                    `json:"translate_wan_addrs" hcl:"translate_wan_addrs"`
+	UIDir                       *string                  `json:"ui_dir" hcl:"ui_dir"`
+	UnixSocket                  UnixSocket               `json:"unix_sockets" hcl:"unix_sockets"`
+	VerifyIncoming              *bool                    `json:"verify_incoming" hcl:"verify_incoming"`
+	VerifyIncomingHTTPS         *bool                    `json:"verify_incoming_https" hcl:"verify_incoming_https"`
+	VerifyIncomingRPC           *bool                    `json:"verify_incoming_rpc" hcl:"verify_incoming_rpc"`
+	VerifyOutgoing              *bool                    `json:"verify_outgoing" hcl:"verify_outgoing"`
+	VerifyServerHostname        *bool                    `json:"verify_server_hostname" hcl:"verify_server_hostname"`
+	Watches                     []map[string]interface{} `json:"watches" hcl:"watches"`
 
-	ACLAgentMasterToken         *string              `json:"acl_agent_master_token" hcl:"acl_agent_master_token"`
-	ACLAgentToken               *string              `json:"acl_agent_token" hcl:"acl_agent_token"`
-	ACLDatacenter               *string              `json:"acl_datacenter" hcl:"acl_datacenter"`
-	ACLDefaultPolicy            *string              `json:"acl_default_policy" hcl:"acl_default_policy"`
-	ACLDownPolicy               *string              `json:"acl_down_policy" hcl:"acl_down_policy"`
-	ACLEnforceVersion8          *bool                `json:"acl_enforce_version_8" hcl:"acl_enforce_version_8"`
-	ACLMasterToken              *string              `json:"acl_master_token" hcl:"acl_master_token"`
-	ACLReplicationToken         *string              `json:"acl_replication_token" hcl:"acl_replication_token"`
-	ACLTTL                      *string              `json:"acl_ttl" hcl:"acl_ttl"`
-	ACLToken                    *string              `json:"acl_token" hcl:"acl_token"`
-	Addresses                   Addresses            `json:"addresses" hcl:"addresses"`
-	AdvertiseAddrLAN            *string              `json:"advertise_addr" hcl:"advertise_addr"`
-	AdvertiseAddrWAN            *string              `json:"advertise_addr_wan" hcl:"advertise_addr_wan"`
-	AdvertiseAddrs              AdvertiseAddrsConfig `json:"advertise_addrs" hcl:"advertise_addrs"`
-	Autopilot                   Autopilot            `json:"autopilot" hcl:"autopilot"`
-	BindAddr                    *string              `json:"bind_addr" hcl:"bind_addr"`
-	Bootstrap                   *bool                `json:"bootstrap" hcl:"bootstrap"`
-	BootstrapExpect             *int                 `json:"bootstrap_expect" hcl:"bootstrap_expect"`
-	CAFile                      *string              `json:"ca_file" hcl:"ca_file"`
-	CAPath                      *string              `json:"ca_path" hcl:"ca_path"`
-	CertFile                    *string              `json:"cert_file" hcl:"cert_file"`
-	Check                       *CheckDefinition     `json:"check" hcl:"check"` // needs to be a pointer to avoid partial merges
-	CheckUpdateInterval         *string              `json:"check_update_interval" hcl:"check_update_interval"`
-	Checks                      []CheckDefinition    `json:"checks" hcl:"checks"`
-	ClientAddr                  *string              `json:"client_addr" hcl:"client_addr"`
-	DNS                         DNS                  `json:"dns_config" hcl:"dns_config"`
-	DNSDomain                   *string              `json:"domain" hcl:"domain"`
-	DNSRecursor                 *string              `json:"recursor" hcl:"recursor"`
-	DNSRecursors                []string             `json:"recursors" hcl:"recursors"`
-	DataDir                     *string              `json:"data_dir" hcl:"data_dir"`
-	Datacenter                  *string              `json:"datacenter" hcl:"datacenter"`
-	DisableAnonymousSignature   *bool                `json:"disable_anonymous_signature" hcl:"disable_anonymous_signature"`
-	DisableCoordinates          *bool                `json:"disable_coordinates" hcl:"disable_coordinates"`
-	DisableHostNodeID           *bool                `json:"disable_host_node_id" hcl:"disable_host_node_id"`
-	DisableKeyringFile          *bool                `json:"disable_keyring_file" hcl:"disable_keyring_file"`
-	DisableRemoteExec           *bool                `json:"disable_remote_exec" hcl:"disable_remote_exec"`
-	DisableUpdateCheck          *bool                `json:"disable_update_check" hcl:"disable_update_check"`
-	EnableACLReplication        *bool                `json:"enable_acl_replication" hcl:"enable_acl_replication"`
-	EnableDebug                 *bool                `json:"enable_debug" hcl:"enable_debug"`
-	EnableScriptChecks          *bool                `json:"enable_script_checks" hcl:"enable_script_checks"`
-	EnableSyslog                *bool                `json:"enable_syslog" hcl:"enable_syslog"`
-	EnableUI                    *bool                `json:"enable_ui" hcl:"enable_ui"`
-	EncryptKey                  *string              `json:"encrypt" hcl:"encrypt"`
-	EncryptVerifyIncoming       *bool                `json:"encrypt_verify_incoming" hcl:"encrypt_verify_incoming"`
-	EncryptVerifyOutgoing       *bool                `json:"encrypt_verify_outgoing" hcl:"encrypt_verify_outgoing"`
-	HTTPConfig                  HTTPConfig           `json:"http_config" hcl:"http_config"`
-	KeyFile                     *string              `json:"key_file" hcl:"key_file"`
-	LeaveOnTerm                 *bool                `json:"leave_on_terminate" hcl:"leave_on_terminate"`
-	Limits                      Limits               `json:"limits" hcl:"limits"`
-	LogLevel                    *string              `json:"log_level" hcl:"log_level"`
-	NodeID                      *string              `json:"node_id" hcl:"node_id"`
-	NodeMeta                    map[string]string    `json:"node_meta" hcl:"node_meta"`
-	NodeName                    *string              `json:"node_name" hcl:"node_name"`
-	NonVotingServer             *bool                `json:"non_voting_server" hcl:"non_voting_server"`
-	Performance                 Performance          `json:"performance" hcl:"performance"`
-	PidFile                     *string              `json:"pid_file" hcl:"pid_file"`
-	Ports                       Ports                `json:"ports" hcl:"ports"`
-	RPCProtocol                 *int                 `json:"protocol" hcl:"protocol"`
-	RaftProtocol                *int                 `json:"raft_protocol" hcl:"raft_protocol"`
-	ReconnectTimeoutLAN         *string              `json:"reconnect_timeout" hcl:"reconnect_timeout"`
-	ReconnectTimeoutWAN         *string              `json:"reconnect_timeout_wan" hcl:"reconnect_timeout_wan"`
-	RejoinAfterLeave            *bool                `json:"rejoin_after_leave" hcl:"rejoin_after_leave"`
-	RetryJoinIntervalLAN        *string              `json:"retry_interval" hcl:"retry_interval"`
-	RetryJoinIntervalWAN        *string              `json:"retry_interval_wan" hcl:"retry_interval_wan"`
-	RetryJoinLAN                []string             `json:"retry_join" hcl:"retry_join"`
-	RetryJoinMaxAttemptsLAN     *int                 `json:"retry_max" hcl:"retry_max"`
-	RetryJoinMaxAttemptsWAN     *int                 `json:"retry_max_wan" hcl:"retry_max_wan"`
-	RetryJoinWAN                []string             `json:"retry_join_wan" hcl:"retry_join_wan"`
-	Segment                     *string              `json:"segment" hcl:"segment"`
-	Segments                    []NetworkSegment     `json:"segments" hcl:"segments"`
-	SerfBindAddrLAN             *string              `json:"serf_lan" hcl:"serf_lan"`
-	SerfBindAddrWAN             *string              `json:"serf_wan" hcl:"serf_wan"`
-	ServerMode                  *bool                `json:"server" hcl:"server"`
-	ServerName                  *string              `json:"server_name" hcl:"server_name"`
-	Service                     *ServiceDefinition   `json:"service" hcl:"service"`
-	Services                    []ServiceDefinition  `json:"services" hcl:"services"`
-	SessionTTLMin               *string              `json:"session_ttl_min" hcl:"session_ttl_min"`
-	SkipLeaveOnInt              *bool                `json:"skip_leave_on_interrupt" hcl:"skip_leave_on_interrupt"`
-	StartJoinAddrsLAN           []string             `json:"start_join" hcl:"start_join"`
-	StartJoinAddrsWAN           []string             `json:"start_join_wan" hcl:"start_join_wan"`
-	SyslogFacility              *string              `json:"syslog_facility" hcl:"syslog_facility"`
-	TLSCipherSuites             *string              `json:"tls_cipher_suites" hcl:"tls_cipher_suites"`
-	TLSMinVersion               *string              `json:"tls_min_version" hcl:"tls_min_version"`
-	TLSPreferServerCipherSuites *bool                `json:"tls_prefer_server_cipher_suites" hcl:"tls_prefer_server_cipher_suites"`
-	TaggedAddresses             map[string]string    `json:"tagged_addresses" hcl:"tagged_addresses"`
-	Telemetry                   Telemetry            `json:"telemetry" hcl:"telemetry"`
-	TranslateWANAddrs           *bool                `json:"translate_wan_addrs" hcl:"translate_wan_addrs"`
-	UIDir                       *string              `json:"ui_dir" hcl:"ui_dir"`
-	UnixSocket                  UnixSocket           `json:"unix_sockets" hcl:"unix_sockets"`
-	VerifyIncoming              *bool                `json:"verify_incoming" hcl:"verify_incoming"`
-	VerifyIncomingHTTPS         *bool                `json:"verify_incoming_https" hcl:"verify_incoming_https"`
-	VerifyIncomingRPC           *bool                `json:"verify_incoming_rpc" hcl:"verify_incoming_rpc"`
-	VerifyOutgoing              *bool                `json:"verify_outgoing" hcl:"verify_outgoing"`
-	VerifyServerHostname        *bool                `json:"verify_server_hostname" hcl:"verify_server_hostname"`
-
-	// tests are done until here
-	Watches []map[string]interface{} `json:"watches" hcl:"watches"`
-
+	DeprecatedAtlasACLToken          *string           `json:"atlas_acl_token" hcl:"atlas_acl_token"`
+	DeprecatedAtlasEndpoint          *string           `json:"atlas_endpoint" hcl:"atlas_endpoint"`
+	DeprecatedAtlasInfrastructure    *string           `json:"atlas_infrastructure" hcl:"atlas_infrastructure"`
+	DeprecatedAtlasJoin              *bool             `json:"atlas_join" hcl:"atlas_join"`
+	DeprecatedAtlasToken             *string           `json:"atlas_token" hcl:"atlas_token"`
 	DeprecatedDogstatsdAddr          *string           `json:"dogstatsd_addr" hcl:"dogstatsd_addr"`
 	DeprecatedDogstatsdTags          []string          `json:"dogstatsd_tags" hcl:"dogstatsd_tags"`
 	DeprecatedHTTPAPIResponseHeaders map[string]string `json:"http_api_response_headers" hcl:"http_api_response_headers"`
@@ -130,7 +161,8 @@ type Addresses struct {
 	DNS   *string `json:"dns" hcl:"dns"`
 	HTTP  *string `json:"http" hcl:"http"`
 	HTTPS *string `json:"https" hcl:"https"`
-	RPC   *string `json:"rpc" hcl:"rpc"`
+
+	DeprecatedRPC *string `json:"rpc" hcl:"rpc"`
 }
 
 type AdvertiseAddrsConfig struct {
@@ -247,44 +279,44 @@ type Ports struct {
 }
 
 type RetryJoinAzure struct {
-	TagName         *string `json:"tag_name" hcl:"tag_name"`
-	TagValue        *string `json:"tag_value" hcl:"tag_value"`
-	SubscriptionID  *string `json:"subscription_id" hcl:"subscription_id"`
-	TenantID        *string `json:"tenant_id" hcl:"tenant_id"`
 	ClientID        *string `json:"client_id" hcl:"client_id"`
 	SecretAccessKey *string `json:"secret_access_key" hcl:"secret_access_key"`
+	SubscriptionID  *string `json:"subscription_id" hcl:"subscription_id"`
+	TagName         *string `json:"tag_name" hcl:"tag_name"`
+	TagValue        *string `json:"tag_value" hcl:"tag_value"`
+	TenantID        *string `json:"tenant_id" hcl:"tenant_id"`
 }
 
 type RetryJoinEC2 struct {
+	AccessKeyID     *string `json:"access_key_id" hcl:"access_key_id"`
 	Region          *string `json:"region" hcl:"region"`
+	SecretAccessKey *string `json:"secret_access_key" hcl:"secret_access_key"`
 	TagKey          *string `json:"tag_key" hcl:"tag_key"`
 	TagValue        *string `json:"tag_value" hcl:"tag_value"`
-	AccessKeyID     *string `json:"access_key_id" hcl:"access_key_id"`
-	SecretAccessKey *string `json:"secret_access_key" hcl:"secret_access_key"`
 }
 
 type RetryJoinGCE struct {
-	ProjectName     *string `json:"project_name" hcl:"project_name"`
-	ZonePattern     *string `json:"zone_pattern" hcl:"zone_pattern"`
-	TagValue        *string `json:"tag_value" hcl:"tag_value"`
 	CredentialsFile *string `json:"credentials_file" hcl:"credentials_file"`
+	ProjectName     *string `json:"project_name" hcl:"project_name"`
+	TagValue        *string `json:"tag_value" hcl:"tag_value"`
+	ZonePattern     *string `json:"zone_pattern" hcl:"zone_pattern"`
 }
 
 type UnixSocket struct {
-	User  *string `json:"user" hcl:"user"`
 	Group *string `json:"group" hcl:"group"`
 	Mode  *string `json:"mode" hcl:"mode"`
+	User  *string `json:"user" hcl:"user"`
 }
 
 type Limits struct {
-	RPCRate     *float64 `json:"rpc_rate" hcl:"rpc_rate"`
 	RPCMaxBurst *int     `json:"rpc_max_burst" hcl:"rpc_max_burst"`
+	RPCRate     *float64 `json:"rpc_rate" hcl:"rpc_rate"`
 }
 
-type NetworkSegment struct {
-	Name        *string `json:"name" hcl:"name"`
+type Segment struct {
+	Advertise   *string `json:"advertise" hcl:"advertise"`
 	Bind        *string `json:"bind" hcl:"bind"`
+	Name        *string `json:"name" hcl:"name"`
 	Port        *int    `json:"port" hcl:"port"`
 	RPCListener *bool   `json:"rpc_listener" hcl:"rpc_listener"`
-	Advertise   *string `json:"advertise" hcl:"advertise"`
 }

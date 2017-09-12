@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/agent/structs"
-	"github.com/hashicorp/consul/watch"
 	"golang.org/x/time/rate"
 )
 
@@ -12,6 +11,17 @@ import (
 // uses. Is is derived from one or more Config structures which can come
 // from files, flags and/or environment variables.
 type RuntimeConfig struct {
+	// non-user configurable values
+	AEInterval                 time.Duration
+	ACLDisabledTTL             time.Duration
+	CheckDeregisterIntervalMin time.Duration
+	CheckReapInterval          time.Duration
+	SyncCoordinateRateTarget   float64
+	SyncCoordinateIntervalMin  time.Duration
+	Revision                   string
+	Version                    string
+	VersionPrerelease          string
+
 	ACLAgentMasterToken string
 	ACLAgentToken       string
 	ACLDatacenter       string
@@ -70,6 +80,9 @@ type RuntimeConfig struct {
 	TelemetryStatsiteAddr                       string
 	TelemetryStatsitePrefix                     string
 
+	AdvertiseAddrLAN            string
+	AdvertiseAddrWAN            string
+	BindAddrs                   []string
 	Bootstrap                   bool
 	BootstrapExpect             int
 	CAFile                      string
@@ -77,8 +90,11 @@ type RuntimeConfig struct {
 	CertFile                    string
 	CheckUpdateInterval         time.Duration
 	Checks                      []*structs.CheckDefinition
-	Datacenter                  string
+	ClientAddrs                 []string
+	DNSAddrs                    []string
+	DNSPort                     int
 	DataDir                     string
+	Datacenter                  string
 	DevMode                     bool
 	DisableAnonymousSignature   bool
 	DisableCoordinates          bool
@@ -94,6 +110,10 @@ type RuntimeConfig struct {
 	EncryptKey                  string
 	EncryptVerifyIncoming       bool
 	EncryptVerifyOutgoing       bool
+	HTTPAddrs                   []string
+	HTTPPort                    int
+	HTTPSAddrs                  []string
+	HTTPSPort                   int
 	KeyFile                     string
 	LeaveOnTerm                 bool
 	LogLevel                    string
@@ -102,9 +122,10 @@ type RuntimeConfig struct {
 	NodeName                    string
 	NonVotingServer             bool
 	PidFile                     string
+	RPCAdvertiseAddr            string
+	RPCMaxBurst                 int
 	RPCProtocol                 int
 	RPCRateLimit                rate.Limit
-	RPCMaxBurst                 int
 	RaftProtocol                int
 	ReconnectTimeoutLAN         time.Duration
 	ReconnectTimeoutWAN         time.Duration
@@ -115,13 +136,19 @@ type RuntimeConfig struct {
 	RetryJoinMaxAttemptsLAN     int
 	RetryJoinMaxAttemptsWAN     int
 	RetryJoinWAN                []string
-	Segment                     string
+	SegmentName                 string
 	Segments                    []structs.NetworkSegment
+	SerfAdvertiseAddrLAN        string
+	SerfAdvertiseAddrWAN        string
+	SerfBindAddrLAN             string
+	SerfBindAddrWAN             string
 	ServerMode                  bool
 	ServerName                  string
 	Services                    []*structs.ServiceDefinition
 	SessionTTLMin               time.Duration
 	SkipLeaveOnInt              bool
+	StartJoinAddrsLAN           []string
+	StartJoinAddrsWAN           []string
 	SyslogFacility              string
 	TLSCipherSuites             []uint16
 	TLSMinVersion               string
@@ -129,51 +156,13 @@ type RuntimeConfig struct {
 	TaggedAddresses             map[string]string
 	TranslateWANAddrs           bool
 	UIDir                       string
-	UnixSocketUser              string
 	UnixSocketGroup             string
 	UnixSocketMode              string
+	UnixSocketUser              string
 	VerifyIncoming              bool
 	VerifyIncomingHTTPS         bool
 	VerifyIncomingRPC           bool
 	VerifyOutgoing              bool
 	VerifyServerHostname        bool
-	WatchPlans                  []*watch.Plan
-
-	// address values
-
-	BindAddrs   []string
-	ClientAddrs []string
-
-	StartJoinAddrsLAN []string
-	StartJoinAddrsWAN []string
-
-	AdvertiseAddrLAN     string
-	AdvertiseAddrWAN     string
-	SerfAdvertiseAddrLAN string
-	SerfAdvertiseAddrWAN string
-	SerfBindAddrLAN      string
-	SerfBindAddrWAN      string
-
-	// server endpoint values
-
-	DNSPort  int
-	DNSAddrs []string
-
-	HTTPPort  int
-	HTTPAddrs []string
-
-	HTTPSPort  int
-	HTTPSAddrs []string
-
-	// unconfigurable values
-	AEInterval                 time.Duration
-	ACLDisabledTTL             time.Duration
-	CheckDeregisterIntervalMin time.Duration
-	CheckReapInterval          time.Duration
-	SyncCoordinateRateTarget   float64
-	SyncCoordinateIntervalMin  time.Duration
-	Revision                   string
-	Version                    string
-	VersionPrerelease          string
-	// WatchPlans []*watch.Plan // ???
+	Watches                     []map[string]interface{}
 }

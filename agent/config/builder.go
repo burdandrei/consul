@@ -1,9 +1,7 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"reflect"
@@ -17,10 +15,8 @@ import (
 	"github.com/hashicorp/consul/ipaddr"
 	"github.com/hashicorp/consul/tlsutil"
 	"github.com/hashicorp/consul/types"
-	"github.com/hashicorp/consul/watch"
 	discover "github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-sockaddr/template"
-	"github.com/hashicorp/hcl"
 	"golang.org/x/time/rate"
 )
 
@@ -67,6 +63,19 @@ type Builder struct {
 	// flag.
 	Default *Config
 
+	// DefaultRuntime contains the default configuration of the non-user
+	// configurable values.
+	DefaultRuntime RuntimeConfig
+
+	// Revision contains the git commit hash.
+	Revision string
+
+	// Version contains the version number.
+	Version string
+
+	// VersionPrerelease contains the version suffix.
+	VersionPrerelease string
+
 	// Configs contains the user configuration fragments in the order to
 	// be merged.
 	Configs []Config
@@ -82,23 +91,6 @@ type Builder struct {
 	// err contains the first error that occurred during
 	// building the runtime configuration.
 	err error
-}
-
-// readFile parses a JSON or HCL config file and appends it to the list of
-// config fragments.
-func (b *Builder) readFile(name string) error {
-	format := "json"
-	if strings.HasSuffix(name, ".hcl") {
-		format = "hcl"
-	}
-	data, err := ioutil.ReadFile(name)
-	if err != nil {
-		return fmt.Errorf("config: Error reading %s: %s", name, err)
-	}
-	if err := b.ReadBytes(data, format); err != nil {
-		return fmt.Errorf("config: Error parsing %s: %s", name, err)
-	}
-	return nil
 }
 
 // ReadPath reads a single config file or all files in a directory (but
@@ -149,37 +141,22 @@ func (b *Builder) ReadPath(path string) error {
 	return nil
 }
 
+// readFile parses a JSON or HCL config file and appends it to the list of
+// config fragments.
+func (b *Builder) readFile(name string) error {
+	c, err := ParseFile(name)
+	if err != nil {
+		return fmt.Errorf("config: Error parsing %s: %s", name, err)
+	}
+	b.Configs = append(b.Configs, c)
+	return nil
+}
+
 type byName []os.FileInfo
 
 func (a byName) Len() int           { return len(a) }
 func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byName) Less(i, j int) bool { return a[i].Name() < a[j].Name() }
-
-// ReadBytes parses config file data in either JSON or HCL format.
-func (b *Builder) ReadBytes(data []byte, format string) error {
-	var c Config
-	switch format {
-	case "json":
-		if err := json.Unmarshal(data, &c); err != nil {
-			return err
-		}
-	case "hcl":
-		if err := hcl.Decode(&c, string(data)); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("invalid format: %s", format)
-	}
-	return b.AppendConfig(c)
-}
-
-// AppendConfig checks for non-recoverable errors and appends the
-// configuration to the list of config fragments from which the runtime
-// configuration is built.
-func (b *Builder) AppendConfig(c Config) error {
-	b.Configs = append(b.Configs, c)
-	return nil
-}
 
 func (b *Builder) BuildAndValidate() (RuntimeConfig, error) {
 	rt, err := b.Build()
@@ -209,19 +186,19 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	//
 
 	if b.Flags.DeprecatedAtlasInfrastructure != nil {
-		b.warn(`'-atlas' is deprecated`)
+		b.warn(`==> DEPRECATION: "-atlas" is deprecated. Please remove it from your configuration`)
 	}
 	if b.Flags.DeprecatedAtlasToken != nil {
-		b.warn(`'-atlas-token' is deprecated`)
+		b.warn(`==> DEPRECATION: "-atlas-token" is deprecated. Please remove it from your configuration`)
 	}
 	if b.Flags.DeprecatedAtlasJoin != nil {
-		b.warn(`'-atlas-join' is deprecated`)
+		b.warn(`==> DEPRECATION: "-atlas-join" is deprecated. Please remove it from your configuration`)
 	}
 	if b.Flags.DeprecatedAtlasEndpoint != nil {
-		b.warn(`'-atlas-endpoint' is deprecated`)
+		b.warn(`==> DEPRECATION: "-atlas-endpoint" is deprecated. Please remove it from your configuration`)
 	}
 	if b.stringVal(b.Flags.DeprecatedDatacenter) != "" && b.stringVal(b.Flags.Config.Datacenter) == "" {
-		b.warn(`'-dc' is deprecated. Use '-datacenter' instead`)
+		b.warn(`==> DEPRECATION: "-dc" is deprecated. Use "-datacenter" instead`)
 		b.Flags.Config.Datacenter = b.Flags.DeprecatedDatacenter
 	}
 
@@ -349,6 +326,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	// todo(fs): add ports
 	advertiseAddrLAN := b.singleIPTemplateVal("advertise lan", c.AdvertiseAddrLAN)
 	advertiseAddrWAN := b.singleIPTemplateVal("advertise wan", c.AdvertiseAddrWAN)
+	rpcAdvertiseAddr := b.singleIPTemplateVal("rpc advertise", c.AdvertiseAddrs.RPC)
 	serfAdvertiseAddrLAN := b.singleIPTemplateVal("serf advertise lan", c.AdvertiseAddrs.SerfLAN)
 	serfAdvertiseAddrWAN := b.singleIPTemplateVal("serf advertise wan", c.AdvertiseAddrs.SerfWAN)
 	serfBindAddrLAN := b.singleIPTemplateVal("serf bind lan", c.SerfBindAddrLAN)
@@ -356,13 +334,13 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 
 	// segments
 	var segments []structs.NetworkSegment
-	for _, segment := range c.Segments {
+	for _, s := range c.Segments {
 		segments = append(segments, structs.NetworkSegment{
-			Name:        b.stringVal(segment.Name),
-			Bind:        b.stringVal(segment.Bind),
-			Port:        b.intVal(segment.Port),
-			RPCListener: b.boolVal(segment.RPCListener),
-			Advertise:   b.stringVal(segment.Advertise),
+			Name:        b.stringVal(s.Name),
+			Bind:        b.stringVal(s.Bind),
+			Port:        b.intVal(s.Port),
+			RPCListener: b.boolVal(s.RPCListener),
+			Advertise:   b.stringVal(s.Advertise),
 		})
 	}
 
@@ -370,9 +348,31 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	// deprecated fields
 	//
 
+	if c.Addresses.DeprecatedRPC != nil {
+		b.warn(`==> DEPRECATION: "addresses.rpc" is deprecated and is no longer used. Please remove it from your configuration.`)
+	}
+	if c.Ports.DeprecatedRPC != nil {
+		b.warn(`==> DEPRECATION: "ports.rpc" is deprecated and is no longer used. Please remove it from your configuration.`)
+	}
+	if c.DeprecatedAtlasInfrastructure != nil {
+		b.warn(`==> DEPRECATION: "atlas_infrastructure" is deprecated and is no longer used. Please remove it from your configuration.`)
+	}
+	if c.DeprecatedAtlasToken != nil {
+		b.warn(`==> DEPRECATION: "atlas_token" is deprecated and is no longer used. Please remove it from your configuration.`)
+	}
+	if c.DeprecatedAtlasACLToken != nil {
+		b.warn(`==> DEPRECATION: "atlas_acl_token" is deprecated and is no longer used. Please remove it from your configuration.`)
+	}
+	if c.DeprecatedAtlasJoin != nil {
+		b.warn(`==> DEPRECATION: "atlas_join" is deprecated and is no longer used. Please remove it from your configuration.`)
+	}
+	if c.DeprecatedAtlasEndpoint != nil {
+		b.warn(`==> DEPRECATION: "atlas_endpoint" is deprecated and is no longer used. Please remove it from your configuration.`)
+	}
+
 	httpResponseHeaders := c.HTTPConfig.ResponseHeaders
 	if len(c.DeprecatedHTTPAPIResponseHeaders) > 0 {
-		b.deprecate("http_api_response_headers", "http_config.response_headers", "")
+		b.warn(`==> DEPRECATION: "http_api_response_headers" is deprecated. Please use "http_config.response_headers" instead.`)
 		if httpResponseHeaders == nil {
 			httpResponseHeaders = map[string]string{}
 		}
@@ -383,31 +383,31 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 
 	dogstatsdAddr := b.stringVal(c.Telemetry.DogstatsdAddr)
 	if c.DeprecatedDogstatsdAddr != nil {
-		b.deprecate("dogstatsd_addr", "telemetry.dogstatsd_addr", "")
+		b.warn(`==> DEPRECATION: "dogstatsd_addr" is deprecated. Please use "telemetry.dogstatsd_addr" instead.`)
 		dogstatsdAddr = b.stringVal(c.DeprecatedDogstatsdAddr)
 	}
 
 	dogstatsdTags := c.Telemetry.DogstatsdTags
 	if len(c.DeprecatedDogstatsdTags) > 0 {
-		b.deprecate("dogstatsd_tags", "telemetry.dogstatsd_tags", "")
+		b.warn(`==> DEPRECATION: "dogstatsd_tags" is deprecated. Please use "telemetry.dogstatsd_tags" instead.`)
 		dogstatsdTags = append(c.DeprecatedDogstatsdTags, dogstatsdTags...)
 	}
 
 	statsdAddr := b.stringVal(c.Telemetry.StatsdAddr)
 	if c.DeprecatedStatsdAddr != nil {
-		b.deprecate("statsd_addr", "telemetry.statsd_addr", "")
+		b.warn(`==> DEPRECATION: "statsd_addr" is deprecated. Please use "telemetry.statsd_addr" instead.`)
 		statsdAddr = b.stringVal(c.DeprecatedStatsdAddr)
 	}
 
 	statsiteAddr := b.stringVal(c.Telemetry.StatsiteAddr)
 	if c.DeprecatedStatsiteAddr != nil {
-		b.deprecate("statsite_addr", "telemetry.statsite_addr", "")
+		b.warn(`==> DEPRECATION: "statsite_addr" is deprecated. Please use "telemetry.statsite_addr" instead.`)
 		statsiteAddr = b.stringVal(c.DeprecatedStatsiteAddr)
 	}
 
 	statsitePrefix := b.stringVal(c.Telemetry.StatsitePrefix)
 	if c.DeprecatedStatsitePrefix != nil {
-		b.deprecate("statsite_prefix", "telemetry.statsite_prefix", "")
+		b.warn(`==> DEPRECATION: "statsite_prefix" is deprecated. Please use "telemetry.statsite_prefix" instead.`)
 		statsitePrefix = b.stringVal(c.DeprecatedStatsitePrefix)
 	}
 
@@ -433,7 +433,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 			m["secret_access_key"] = "hidden"
 		}
 
-		b.warn("config: retry_join_ec2 is deprecated. Please add %q to retry_join.", m)
+		b.warn(`==> DEPRECATION: "retry_join_ec2" is deprecated. Please add %q to "retry_join".`, m)
 	}
 
 	if !reflect.DeepEqual(c.DeprecatedRetryJoinAzure, RetryJoinAzure{}) {
@@ -463,7 +463,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 			m["secret_access_key"] = "hidden"
 		}
 
-		b.warn("config: retry_join_azure is deprecated. Please add %q to retry_join.", m)
+		b.warn(`==> DEPRECATION: "retry_join_azure" is deprecated. Please add %q to "retry_join".`, m)
 	}
 
 	if !reflect.DeepEqual(c.DeprecatedRetryJoinGCE, RetryJoinGCE{}) {
@@ -482,34 +482,46 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 			m["credentials_file"] = "hidden"
 		}
 
-		b.warn("config: retry_join_gce is deprecated. Please add %q to retry_join.", m)
+		b.warn(`==> DEPRECATION: "retry_join_gce" is deprecated. Please add %q to "retry_join".`, m)
 	}
 
 	// Compile all the watches
-	var watchPlans []*watch.Plan
-	for _, params := range c.Watches {
-		// Parse the watches, excluding the handler
-		wp, err := watch.ParseExempt(params, []string{"handler"})
-		if err != nil {
-			b.err = fmt.Errorf("Failed to parse watch (%#v): %v", params, err)
-			panic(b.err)
-		}
+	// var watchPlans []*watch.Plan
+	// for _, params := range c.Watches {
+	// 	// Parse the watches, excluding the handler
+	// 	wp, err := watch.ParseExempt(params, []string{"handler"})
+	// 	if err != nil {
+	// 		b.err = fmt.Errorf("Failed to parse watch (%#v): %v", params, err)
+	// 		panic(b.err)
+	// 	}
 
-		// Get the handler
-		h := wp.Exempt["handler"]
-		if _, ok := h.(string); h == nil || !ok {
-			b.err = fmt.Errorf("Watch handler must be a string")
-			panic(b.err)
-		}
+	// 	// Get the handler
+	// 	h := wp.Exempt["handler"]
+	// 	if _, ok := h.(string); h == nil || !ok {
+	// 		b.err = fmt.Errorf("Watch handler must be a string")
+	// 		panic(b.err)
+	// 	}
 
-		// Store the watch plan
-		watchPlans = append(watchPlans, wp)
-	}
+	// 	// Store the watch plan
+	// 	watchPlans = append(watchPlans, wp)
+	// }
 
 	// ----------------------------------------------------------------
 	// build runtime config
 	//
 	rt = RuntimeConfig{
+		// non-user configurable values
+		ACLDisabledTTL:             b.DefaultRuntime.ACLDisabledTTL,
+		AEInterval:                 b.DefaultRuntime.AEInterval,
+		CheckDeregisterIntervalMin: b.DefaultRuntime.CheckDeregisterIntervalMin,
+		CheckReapInterval:          b.DefaultRuntime.CheckReapInterval,
+		SyncCoordinateIntervalMin:  b.DefaultRuntime.SyncCoordinateIntervalMin,
+		SyncCoordinateRateTarget:   b.DefaultRuntime.SyncCoordinateRateTarget,
+
+		Revision:          b.Revision,
+		Version:           b.Version,
+		VersionPrerelease: b.VersionPrerelease,
+
 		// ACL
 		ACLAgentMasterToken:  b.stringVal(c.ACLAgentMasterToken),
 		ACLAgentToken:        b.stringVal(c.ACLAgentToken),
@@ -617,6 +629,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		NodeName:                    b.nodeName(c.NodeName),
 		NonVotingServer:             b.boolVal(c.NonVotingServer),
 		PidFile:                     b.stringVal(c.PidFile),
+		RPCAdvertiseAddr:            rpcAdvertiseAddr,
 		RPCProtocol:                 b.intVal(c.RPCProtocol),
 		RPCRateLimit:                rate.Limit(b.float64Val(c.Limits.RPCRate)),
 		RPCMaxBurst:                 b.intVal(c.Limits.RPCMaxBurst),
@@ -630,7 +643,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		RetryJoinMaxAttemptsLAN:     b.intVal(c.RetryJoinMaxAttemptsLAN),
 		RetryJoinMaxAttemptsWAN:     b.intVal(c.RetryJoinMaxAttemptsWAN),
 		RetryJoinWAN:                c.RetryJoinWAN,
-		Segment:                     b.stringVal(c.Segment),
+		SegmentName:                 b.stringVal(c.SegmentName),
 		Segments:                    segments,
 		SerfAdvertiseAddrLAN:        serfAdvertiseAddrLAN,
 		SerfAdvertiseAddrWAN:        serfAdvertiseAddrWAN,
@@ -658,13 +671,13 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		VerifyIncomingRPC:           b.boolVal(c.VerifyIncomingRPC),
 		VerifyOutgoing:              b.boolVal(c.VerifyOutgoing),
 		VerifyServerHostname:        b.boolVal(c.VerifyServerHostname),
-		WatchPlans:                  watchPlans,
+		Watches:                     c.Watches,
 	}
 
 	if rt.BootstrapExpect == 1 {
 		rt.Bootstrap = true
 		rt.BootstrapExpect = 0
-		b.warn("BootstrapExpect is set to 1; this is the same as Bootstrap mode.")
+		b.warn(`BootstrapExpect is set to 1; this is the same as Bootstrap mode.`)
 	}
 
 	return rt, b.err
@@ -711,15 +724,15 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 		b.warn("BootstrapExpect mode enabled, expecting %d servers", rt.BootstrapExpect)
 	}
 	if rt.BootstrapExpect == 2 {
-		b.warn("A cluster with 2 servers will provide no failure tolerance.  See https://www.consul.io/docs/internals/consensus.html#deployment-table")
+		b.warn(`A cluster with 2 servers will provide no failure tolerance.  See https://www.consul.io/docs/internals/consensus.html#deployment-table`)
 	}
 
 	if rt.BootstrapExpect > 2 && rt.BootstrapExpect%2 == 0 {
-		b.warn("A cluster with an even number of servers does not achieve optimum fault tolerance.  See https://www.consul.io/docs/internals/consensus.html#deployment-table")
+		b.warn(`A cluster with an even number of servers does not achieve optimum fault tolerance.  See https://www.consul.io/docs/internals/consensus.html#deployment-table`)
 	}
 
 	if rt.Bootstrap {
-		b.warn("Bootstrap mode enabled! Do not enable unless necessary")
+		b.warn(`Bootstrap mode enabled! Do not enable unless necessary`)
 	}
 
 	if rt.EnableUI && rt.UIDir != "" {
@@ -750,28 +763,44 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 	}
 
 	// make sure listener addresses are unique
+	// todo(fs): check serf and rpc advertise/bind addresses for uniqueness as well
 	usage := map[string]string{}
-	uniqueUsage := func(name string, addrs []string) error {
+	uniqueAddr := func(name, addr string) error {
+		if other, inuse := usage[addr]; inuse {
+			return fmt.Errorf("%s address %s already configured for %s", name, addr, other)
+		}
+		usage[addr] = name
+		return nil
+	}
+	uniqueAddrs := func(name string, addrs []string) error {
 		for _, a := range addrs {
-			if other, inuse := usage[a]; inuse {
-				return fmt.Errorf("%s address %s already configured for %s", name, a, other)
+			if err := uniqueAddr(name, a); err != nil {
+				return err
 			}
-			usage[a] = name
 		}
 		return nil
 	}
 
-	if err := uniqueUsage("DNS", rt.DNSAddrs); err != nil {
+	if err := uniqueAddrs("DNS", rt.DNSAddrs); err != nil {
 		return err
 	}
-	if err := uniqueUsage("HTTP", rt.HTTPAddrs); err != nil {
+	if err := uniqueAddrs("HTTP", rt.HTTPAddrs); err != nil {
 		return err
 	}
-	if err := uniqueUsage("HTTPS", rt.HTTPSAddrs); err != nil {
+	if err := uniqueAddrs("HTTPS", rt.HTTPSAddrs); err != nil {
 		return err
 	}
+	// if err := uniqueAddr("RPC Advertise", b.joinHostPo(rt.RPCAdvertiseAddr, rt.Ports.Server); err != nil {
+	// 	return err
+	// }
+	// if err := uniqueAddr("Serf Advertise LAN", rt.SerfAdvertiseAddrLAN); err != nil {
+	// 	return err
+	// }
+	// if err := uniqueAddr("Serf Advertise WAN", rt.SerfAdvertiseAddrWAN); err != nil {
+	// 	return err
+	// }
 
-	if rt.ServerMode && rt.Segment != "" {
+	if rt.ServerMode && rt.SegmentName != "" {
 		return fmt.Errorf("Segment option can only be set on clients")
 	}
 
@@ -799,13 +828,6 @@ func (b *Builder) splitSlicesAndValues(c Config) (slices, values Config) {
 	return rs.Elem().Interface().(Config), rv.Elem().Interface().(Config)
 }
 
-func (b *Builder) deprecate(oldname, newname, where string) {
-	if where != "" {
-		where = " " + where
-	}
-	b.warn("config: %q is deprecated%s. Please use %q instead.", oldname, where, newname)
-}
-
 func (b *Builder) warn(msg string, args ...interface{}) {
 	b.Warnings = append(b.Warnings, fmt.Sprintf(msg, args...))
 }
@@ -822,25 +844,25 @@ func (b *Builder) checkVal(v *CheckDefinition) *structs.CheckDefinition {
 
 	serviceID := v.ServiceID
 	if v.AliasServiceID != nil {
-		b.deprecate("serviceid", "service_id", "in check definitions")
+		b.warn(`==> DEPRECATION: "serviceid" is deprecated in check definitions. Please use "service_id" instead.`)
 		serviceID = v.AliasServiceID
 	}
 
 	dockerContainerID := v.DockerContainerID
 	if v.AliasDockerContainerID != nil {
-		b.deprecate("dockercontainerid", "docker_container_id", "in check definitions")
+		b.warn(`==> DEPRECATION: "dockercontainerid" is deprecated in check definitions. Please use "docker_container_id" instead.`)
 		dockerContainerID = v.AliasDockerContainerID
 	}
 
 	tlsSkipVerify := v.TLSSkipVerify
 	if v.AliasTLSSkipVerify != nil {
-		b.deprecate("tlsskipverify", "tls_skip_verify", "in check definitions")
+		b.warn(`==> DEPRECATION: "tlsskipverify" is deprecated in check definitions. Please use "tls_skip_verify" instead.`)
 		tlsSkipVerify = v.AliasTLSSkipVerify
 	}
 
 	deregisterCriticalServiceAfter := v.DeregisterCriticalServiceAfter
 	if v.AliasDeregisterCriticalServiceAfter != nil {
-		b.deprecate("deregistercriticalserviceafter", "deregister_critical_service_after", "in check definitions")
+		b.warn(`==> DEPRECATION: "deregistercriticalserviceafter" is deprecated in check definitions. Please use "deregister_critical_service_after" instead.`)
 		deregisterCriticalServiceAfter = v.AliasDeregisterCriticalServiceAfter
 	}
 

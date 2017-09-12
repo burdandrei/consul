@@ -526,9 +526,9 @@ func (cmd *AgentCommand) readConfig() *agent.Config {
 	// done: }
 
 	// Set the version info
-	cfg.Revision = cmd.Revision
-	cfg.Version = cmd.Version
-	cfg.VersionPrerelease = cmd.VersionPrerelease
+	// done: cfg.Revision = cmd.Revision
+	// done: cfg.Version = cmd.Version
+	// done: cfg.VersionPrerelease = cmd.VersionPrerelease
 
 	if err := cfg.ResolveTmplAddrs(); err != nil {
 		cmd.UI.Error(fmt.Sprintf("Failed to parse config: %v", err))
