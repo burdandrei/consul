@@ -20,6 +20,7 @@ import (
 
 	"github.com/armon/go-metrics"
 	"github.com/hashicorp/consul/acl"
+	"github.com/hashicorp/consul/agent/config"
 	"github.com/hashicorp/consul/agent/consul"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/agent/systemd"
@@ -83,7 +84,7 @@ type notifier interface {
 // requests to other Consul servers.
 type Agent struct {
 	// config is the agent configuration.
-	config *Config
+	config *config.RuntimeConfig
 
 	// Used for writing our logs
 	logger *log.Logger
@@ -165,13 +166,13 @@ type Agent struct {
 	endpointsLock sync.RWMutex
 
 	// dnsAddr is the address the DNS server binds to
-	dnsAddrs []ProtoAddr
+	dnsAddrs []config.ProtoAddr
 
 	// dnsServer provides the DNS API
 	dnsServers []*DNSServer
 
 	// httpAddrs are the addresses per protocol the HTTP server binds to
-	httpAddrs []ProtoAddr
+	httpAddrs []config.ProtoAddr
 
 	// httpServers provides the HTTP API on various endpoints
 	httpServers []*HTTPServer
@@ -189,18 +190,18 @@ type Agent struct {
 	tokens *token.Store
 }
 
-func New(c *Config) (*Agent, error) {
+func New(c *config.RuntimeConfig) (*Agent, error) {
 	if c.Datacenter == "" {
 		return nil, fmt.Errorf("Must configure a Datacenter")
 	}
 	if c.DataDir == "" && !c.DevMode {
 		return nil, fmt.Errorf("Must configure a DataDir")
 	}
-	dnsAddrs, err := c.DNSAddrs()
+	dnsAddrs, err := c.GetDNSAddrs()
 	if err != nil {
 		return nil, fmt.Errorf("Invalid DNS bind address: %s", err)
 	}
-	httpAddrs, err := c.HTTPAddrs()
+	httpAddrs, err := c.GetHTTPAddrs()
 	if err != nil {
 		return nil, fmt.Errorf("Invalid HTTP bind address: %s", err)
 	}
@@ -269,7 +270,7 @@ func (a *Agent) Start() error {
 	consulCfg.ServerUp = a.state.ConsulServerUp
 
 	// Setup either the client or the server.
-	if c.Server {
+	if c.ServerMode {
 		server, err := consul.NewServerLogger(consulCfg, a.logger, a.tokens)
 		if err != nil {
 			return fmt.Errorf("Failed to start Consul server: %v", err)
@@ -349,7 +350,7 @@ func (a *Agent) Start() error {
 }
 
 func (a *Agent) listenAndServeDNS() error {
-	notif := make(chan ProtoAddr, len(a.dnsAddrs))
+	notif := make(chan config.ProtoAddr, len(a.dnsAddrs))
 	for _, p := range a.dnsAddrs {
 		p := p // capture loop var
 
@@ -401,7 +402,7 @@ func (a *Agent) listenAndServeDNS() error {
 //
 // This approach should ultimately be refactored to the point where we just
 // start the server and any error should trigger a proper shutdown of the agent.
-func (a *Agent) listenHTTP(addrs []ProtoAddr) ([]net.Listener, error) {
+func (a *Agent) listenHTTP(addrs []config.ProtoAddr) ([]net.Listener, error) {
 	var ln []net.Listener
 	for _, p := range addrs {
 		var l net.Listener
@@ -518,9 +519,9 @@ func (a *Agent) serveHTTP(l net.Listener, srv *HTTPServer) error {
 
 // reloadWatches stops any existing watch plans and attempts to load the given
 // set of watches.
-func (a *Agent) reloadWatches(cfg *Config) error {
+func (a *Agent) reloadWatches(cfg *config.RuntimeConfig) error {
 	// Watches use the API to talk to this agent, so that must be enabled.
-	addrs, err := cfg.HTTPAddrs()
+	addrs, err := cfg.GetHTTPAddrs()
 	if err != nil {
 		return err
 	}
@@ -572,8 +573,8 @@ func (a *Agent) consulConfig() (*consul.Config, error) {
 	base.DevMode = a.config.DevMode
 
 	// Apply performance factors
-	if a.config.Performance.RaftMultiplier > 0 {
-		base.ScaleRaft(a.config.Performance.RaftMultiplier)
+	if a.config.PerformanceRaftMultiplier > 0 {
+		base.ScaleRaft(a.config.PerformanceRaftMultiplier)
 	}
 
 	// Override with our config
@@ -586,18 +587,18 @@ func (a *Agent) consulConfig() (*consul.Config, error) {
 	if a.config.NodeName != "" {
 		base.NodeName = a.config.NodeName
 	}
-	if a.config.Ports.SerfLan != 0 {
-		base.SerfLANConfig.MemberlistConfig.BindPort = a.config.Ports.SerfLan
-		base.SerfLANConfig.MemberlistConfig.AdvertisePort = a.config.Ports.SerfLan
+	if a.config.SerfPortLAN != 0 {
+		base.SerfLANConfig.MemberlistConfig.BindPort = a.config.SerfPortLAN
+		base.SerfLANConfig.MemberlistConfig.AdvertisePort = a.config.SerfPortLAN
 	}
-	if a.config.Ports.SerfWan != 0 {
-		base.SerfWANConfig.MemberlistConfig.BindPort = a.config.Ports.SerfWan
-		base.SerfWANConfig.MemberlistConfig.AdvertisePort = a.config.Ports.SerfWan
+	if a.config.SerfPortWAN != 0 {
+		base.SerfWANConfig.MemberlistConfig.BindPort = a.config.SerfPortWAN
+		base.SerfWANConfig.MemberlistConfig.AdvertisePort = a.config.SerfPortWAN
 	}
 	if a.config.BindAddr != "" {
 		bindAddr := &net.TCPAddr{
 			IP:   net.ParseIP(a.config.BindAddr),
-			Port: a.config.Ports.Server,
+			Port: a.config.ServerPort,
 		}
 		base.RPCAddr = bindAddr
 
@@ -606,50 +607,50 @@ func (a *Agent) consulConfig() (*consul.Config, error) {
 		base.SerfLANConfig.MemberlistConfig.BindAddr = a.config.BindAddr
 		base.SerfWANConfig.MemberlistConfig.BindAddr = a.config.BindAddr
 	}
-	if a.config.SerfLanBindAddr != "" {
-		base.SerfLANConfig.MemberlistConfig.BindAddr = a.config.SerfLanBindAddr
+	if a.config.SerfBindAddrLAN != "" {
+		base.SerfLANConfig.MemberlistConfig.BindAddr = a.config.SerfBindAddrLAN
 	}
-	if a.config.SerfWanBindAddr != "" {
-		base.SerfWANConfig.MemberlistConfig.BindAddr = a.config.SerfWanBindAddr
+	if a.config.SerfBindAddrWAN != "" {
+		base.SerfWANConfig.MemberlistConfig.BindAddr = a.config.SerfBindAddrWAN
 	}
 
-	if a.config.AdvertiseAddr != "" {
-		base.SerfLANConfig.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddr
-		base.SerfWANConfig.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddr
-		if a.config.AdvertiseAddrWan != "" {
-			base.SerfWANConfig.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddrWan
+	if a.config.AdvertiseAddrLAN != "" {
+		base.SerfLANConfig.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddrLAN
+		base.SerfWANConfig.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddrLAN
+		if a.config.AdvertiseAddrWAN != "" {
+			base.SerfWANConfig.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddrWAN
 		}
 		base.RPCAdvertise = &net.TCPAddr{
-			IP:   net.ParseIP(a.config.AdvertiseAddr),
-			Port: a.config.Ports.Server,
+			IP:   net.ParseIP(a.config.AdvertiseAddrLAN),
+			Port: a.config.ServerPort,
 		}
 	}
-	if a.config.AdvertiseAddrs.SerfLan != nil {
-		base.SerfLANConfig.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddrs.SerfLan.IP.String()
-		base.SerfLANConfig.MemberlistConfig.AdvertisePort = a.config.AdvertiseAddrs.SerfLan.Port
+	if a.config.SerfAdvertiseAddrLAN != "" {
+		base.SerfLANConfig.MemberlistConfig.AdvertiseAddr = a.config.SerfAdvertiseAddrLAN
+		base.SerfLANConfig.MemberlistConfig.AdvertisePort = a.config.SerfPortLAN
 	}
-	if a.config.AdvertiseAddrs.SerfWan != nil {
-		base.SerfWANConfig.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddrs.SerfWan.IP.String()
-		base.SerfWANConfig.MemberlistConfig.AdvertisePort = a.config.AdvertiseAddrs.SerfWan.Port
+	if a.config.SerfAdvertiseAddrWAN != "" {
+		base.SerfWANConfig.MemberlistConfig.AdvertiseAddr = a.config.SerfAdvertiseAddrWAN
+		base.SerfWANConfig.MemberlistConfig.AdvertisePort = a.config.SerfPortWAN
 	}
-	if a.config.ReconnectTimeoutLan != 0 {
-		base.SerfLANConfig.ReconnectTimeout = a.config.ReconnectTimeoutLan
+	if a.config.ReconnectTimeoutLAN != 0 {
+		base.SerfLANConfig.ReconnectTimeout = a.config.ReconnectTimeoutLAN
 	}
-	if a.config.ReconnectTimeoutWan != 0 {
-		base.SerfWANConfig.ReconnectTimeout = a.config.ReconnectTimeoutWan
+	if a.config.ReconnectTimeoutWAN != 0 {
+		base.SerfWANConfig.ReconnectTimeout = a.config.ReconnectTimeoutWAN
 	}
-	if a.config.EncryptVerifyIncoming != nil {
-		base.SerfWANConfig.MemberlistConfig.GossipVerifyIncoming = *a.config.EncryptVerifyIncoming
-		base.SerfLANConfig.MemberlistConfig.GossipVerifyIncoming = *a.config.EncryptVerifyIncoming
+	if a.config.EncryptVerifyIncoming {
+		base.SerfWANConfig.MemberlistConfig.GossipVerifyIncoming = a.config.EncryptVerifyIncoming
+		base.SerfLANConfig.MemberlistConfig.GossipVerifyIncoming = a.config.EncryptVerifyIncoming
 	}
-	if a.config.EncryptVerifyOutgoing != nil {
-		base.SerfWANConfig.MemberlistConfig.GossipVerifyOutgoing = *a.config.EncryptVerifyOutgoing
-		base.SerfLANConfig.MemberlistConfig.GossipVerifyOutgoing = *a.config.EncryptVerifyOutgoing
+	if a.config.EncryptVerifyOutgoing {
+		base.SerfWANConfig.MemberlistConfig.GossipVerifyOutgoing = a.config.EncryptVerifyOutgoing
+		base.SerfLANConfig.MemberlistConfig.GossipVerifyOutgoing = a.config.EncryptVerifyOutgoing
 	}
-	if a.config.AdvertiseAddrs.RPC != nil {
-		base.RPCAdvertise = a.config.AdvertiseAddrs.RPC
+	if a.config.RPCAdvertiseAddr != "" {
+		base.RPCAdvertise = a.config.RPCAdvertiseAddr
 	}
-	base.Segment = a.config.Segment
+	base.Segment = a.config.SegmentName
 	if len(a.config.Segments) > 0 {
 		segments, err := a.segmentConfig()
 		if err != nil {
@@ -666,8 +667,8 @@ func (a *Agent) consulConfig() (*consul.Config, error) {
 	if a.config.BootstrapExpect != 0 {
 		base.BootstrapExpect = a.config.BootstrapExpect
 	}
-	if a.config.Protocol > 0 {
-		base.ProtocolVersion = uint8(a.config.Protocol)
+	if a.config.RPCProtocol > 0 {
+		base.ProtocolVersion = uint8(a.config.RPCProtocol)
 	}
 	if a.config.RaftProtocol != 0 {
 		base.RaftConfig.ProtocolVersion = raft.ProtocolVersion(a.config.RaftProtocol)
@@ -678,7 +679,7 @@ func (a *Agent) consulConfig() (*consul.Config, error) {
 	if a.config.ACLDatacenter != "" {
 		base.ACLDatacenter = a.config.ACLDatacenter
 	}
-	if a.config.ACLTTLRaw != "" {
+	if a.config.ACLTTL != 0 {
 		base.ACLTTL = a.config.ACLTTL
 	}
 	if a.config.ACLDefaultPolicy != "" {
@@ -688,35 +689,35 @@ func (a *Agent) consulConfig() (*consul.Config, error) {
 		base.ACLDownPolicy = a.config.ACLDownPolicy
 	}
 	base.EnableACLReplication = a.config.EnableACLReplication
-	if a.config.ACLEnforceVersion8 != nil {
-		base.ACLEnforceVersion8 = *a.config.ACLEnforceVersion8
+	if a.config.ACLEnforceVersion8 {
+		base.ACLEnforceVersion8 = a.config.ACLEnforceVersion8
 	}
-	if a.config.SessionTTLMinRaw != "" {
+	if a.config.SessionTTLMin != 0 {
 		base.SessionTTLMin = a.config.SessionTTLMin
 	}
-	if a.config.Autopilot.CleanupDeadServers != nil {
-		base.AutopilotConfig.CleanupDeadServers = *a.config.Autopilot.CleanupDeadServers
+	if a.config.AutopilotCleanupDeadServers {
+		base.AutopilotConfig.CleanupDeadServers = a.config.AutopilotCleanupDeadServers
 	}
-	if a.config.Autopilot.LastContactThreshold != nil {
-		base.AutopilotConfig.LastContactThreshold = *a.config.Autopilot.LastContactThreshold
+	if a.config.AutopilotLastContactThreshold != 0 {
+		base.AutopilotConfig.LastContactThreshold = a.config.AutopilotLastContactThreshold
 	}
-	if a.config.Autopilot.MaxTrailingLogs != nil {
-		base.AutopilotConfig.MaxTrailingLogs = *a.config.Autopilot.MaxTrailingLogs
+	if a.config.AutopilotMaxTrailingLogs != 0 {
+		base.AutopilotConfig.MaxTrailingLogs = uint64(a.config.AutopilotMaxTrailingLogs)
 	}
-	if a.config.Autopilot.ServerStabilizationTime != nil {
-		base.AutopilotConfig.ServerStabilizationTime = *a.config.Autopilot.ServerStabilizationTime
+	if a.config.AutopilotServerStabilizationTime != 0 {
+		base.AutopilotConfig.ServerStabilizationTime = a.config.AutopilotServerStabilizationTime
 	}
 	if a.config.NonVotingServer {
 		base.NonVoter = a.config.NonVotingServer
 	}
-	if a.config.Autopilot.RedundancyZoneTag != "" {
-		base.AutopilotConfig.RedundancyZoneTag = a.config.Autopilot.RedundancyZoneTag
+	if a.config.AutopilotRedundancyZoneTag != "" {
+		base.AutopilotConfig.RedundancyZoneTag = a.config.AutopilotRedundancyZoneTag
 	}
-	if a.config.Autopilot.DisableUpgradeMigration != nil {
-		base.AutopilotConfig.DisableUpgradeMigration = *a.config.Autopilot.DisableUpgradeMigration
+	if a.config.AutopilotDisableUpgradeMigration {
+		base.AutopilotConfig.DisableUpgradeMigration = a.config.AutopilotDisableUpgradeMigration
 	}
-	if a.config.Autopilot.UpgradeVersionTag != "" {
-		base.AutopilotConfig.UpgradeVersionTag = a.config.Autopilot.UpgradeVersionTag
+	if a.config.AutopilotUpgradeVersionTag != "" {
+		base.AutopilotConfig.UpgradeVersionTag = a.config.AutopilotUpgradeVersionTag
 	}
 
 	// make sure the advertise address is always set
@@ -725,11 +726,11 @@ func (a *Agent) consulConfig() (*consul.Config, error) {
 	}
 
 	// Rate limiting for RPC calls.
-	if a.config.Limits.RPCRate > 0 {
-		base.RPCRate = a.config.Limits.RPCRate
+	if a.config.RPCRateLimit > 0 {
+		base.RPCRate = a.config.RPCRateLimit
 	}
-	if a.config.Limits.RPCMaxBurst > 0 {
-		base.RPCMaxBurst = a.config.Limits.RPCMaxBurst
+	if a.config.RPCMaxBurst > 0 {
+		base.RPCMaxBurst = a.config.RPCMaxBurst
 	}
 
 	// set the src address for outgoing rpc connections
@@ -757,7 +758,7 @@ func (a *Agent) consulConfig() (*consul.Config, error) {
 	base.CertFile = a.config.CertFile
 	base.KeyFile = a.config.KeyFile
 	base.ServerName = a.config.ServerName
-	base.Domain = a.config.Domain
+	base.Domain = a.config.DNSDomain
 	base.TLSMinVersion = a.config.TLSMinVersion
 	base.TLSCipherSuites = a.config.TLSCipherSuites
 	base.TLSPreferServerCipherSuites = a.config.TLSPreferServerCipherSuites
@@ -793,7 +794,7 @@ func (a *Agent) segmentConfig() ([]consul.NetworkSegment, error) {
 		if segment.Advertise != "" {
 			serfConf.MemberlistConfig.AdvertiseAddr = segment.Advertise
 		} else {
-			serfConf.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddr
+			serfConf.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddrLAN
 		}
 		if segment.Bind != "" {
 			serfConf.MemberlistConfig.BindAddr = segment.Bind
@@ -803,21 +804,21 @@ func (a *Agent) segmentConfig() ([]consul.NetworkSegment, error) {
 		serfConf.MemberlistConfig.AdvertisePort = segment.Port
 		serfConf.MemberlistConfig.BindPort = segment.Port
 
-		if config.ReconnectTimeoutLan != 0 {
-			serfConf.ReconnectTimeout = config.ReconnectTimeoutLan
+		if config.ReconnectTimeoutLAN != 0 {
+			serfConf.ReconnectTimeout = config.ReconnectTimeoutLAN
 		}
-		if config.EncryptVerifyIncoming != nil {
-			serfConf.MemberlistConfig.GossipVerifyIncoming = *config.EncryptVerifyIncoming
+		if config.EncryptVerifyIncoming {
+			serfConf.MemberlistConfig.GossipVerifyIncoming = config.EncryptVerifyIncoming
 		}
-		if config.EncryptVerifyOutgoing != nil {
-			serfConf.MemberlistConfig.GossipVerifyOutgoing = *config.EncryptVerifyOutgoing
+		if config.EncryptVerifyOutgoing {
+			serfConf.MemberlistConfig.GossipVerifyOutgoing = config.EncryptVerifyOutgoing
 		}
 
 		var rpcAddr *net.TCPAddr
 		if segment.RPCListener {
 			rpcAddr = &net.TCPAddr{
 				IP:   net.ParseIP(segment.Bind),
-				Port: a.config.Ports.Server,
+				Port: a.config.ServerPort,
 			}
 		}
 
@@ -852,7 +853,7 @@ func (a *Agent) makeRandomID() (string, error) {
 // gopsutil change implementations without affecting in-place upgrades of nodes.
 func (a *Agent) makeNodeID() (string, error) {
 	// If they've disabled host-based IDs then just make a random one.
-	if *a.config.DisableHostNodeID {
+	if a.config.DisableHostNodeID {
 		return a.makeRandomID()
 	}
 
@@ -889,7 +890,7 @@ func (a *Agent) makeNodeID() (string, error) {
 
 // setupNodeID will pull the persisted node ID, if any, or create a random one
 // and persist it.
-func (a *Agent) setupNodeID(config *Config) error {
+func (a *Agent) setupNodeID(config *config.RuntimeConfig) error {
 	// If they've configured a node ID manually then just use that, as
 	// long as it's valid.
 	if config.NodeID != "" {
@@ -961,7 +962,7 @@ func (a *Agent) setupBaseKeyrings(config *consul.Config) error {
 		if err := loadKeyring(config.SerfLANConfig, keys); err != nil {
 			return err
 		}
-		if a.config.Server {
+		if a.config.ServerMode {
 			if err := loadKeyring(config.SerfWANConfig, keys); err != nil {
 				return err
 			}
@@ -981,7 +982,7 @@ func (a *Agent) setupBaseKeyrings(config *consul.Config) error {
 			return err
 		}
 	}
-	if a.config.Server {
+	if a.config.ServerMode {
 		if _, err := os.Stat(fileWAN); err != nil {
 			if err := initKeyring(fileWAN, a.config.EncryptKey); err != nil {
 				return err
@@ -996,7 +997,7 @@ LOAD:
 	if err := loadKeyringFile(config.SerfLANConfig); err != nil {
 		return err
 	}
-	if a.config.Server {
+	if a.config.ServerMode {
 		if _, err := os.Stat(fileWAN); err == nil {
 			config.SerfWANConfig.KeyringFile = fileWAN
 		}
@@ -2007,7 +2008,7 @@ func (a *Agent) deletePid() error {
 
 // loadServices will load service definitions from configuration and persisted
 // definitions on disk, and load them into the local agent.
-func (a *Agent) loadServices(conf *Config) error {
+func (a *Agent) loadServices(conf *config.RuntimeConfig) error {
 	// Register the services from config
 	for _, service := range conf.Services {
 		ns := service.NodeService()
@@ -2096,7 +2097,7 @@ func (a *Agent) unloadServices() error {
 
 // loadChecks loads check definitions and/or persisted check definitions from
 // disk and re-registers them with the local agent.
-func (a *Agent) loadChecks(conf *Config) error {
+func (a *Agent) loadChecks(conf *config.RuntimeConfig) error {
 	// Register the checks from config
 	for _, check := range conf.Checks {
 		health := check.HealthCheck(conf.NodeName)
@@ -2200,15 +2201,15 @@ func (a *Agent) restoreCheckState(snap map[types.CheckID]*structs.HealthCheck) {
 
 // loadMetadata loads node metadata fields from the agent config and
 // updates them on the local agent.
-func (a *Agent) loadMetadata(conf *Config) error {
+func (a *Agent) loadMetadata(conf *config.RuntimeConfig) error {
 	a.state.Lock()
 	defer a.state.Unlock()
 
-	for key, value := range conf.Meta {
+	for key, value := range conf.NodeMeta {
 		a.state.metadata[key] = value
 	}
 
-	a.state.metadata[structs.MetaSegmentKey] = conf.Segment
+	a.state.metadata[structs.MetaSegmentKey] = conf.SegmentName
 
 	a.state.changeMade()
 
@@ -2316,7 +2317,7 @@ func (a *Agent) DisableNodeMaintenance() {
 	a.logger.Printf("[INFO] agent: Node left maintenance mode")
 }
 
-func (a *Agent) ReloadConfig(newCfg *Config) error {
+func (a *Agent) ReloadConfig(newCfg *config.RuntimeConfig) error {
 	// Bulk update the services and checks
 	a.PauseSync()
 	defer a.ResumeSync()
@@ -2351,7 +2352,7 @@ func (a *Agent) ReloadConfig(newCfg *Config) error {
 	}
 
 	// Update filtered metrics
-	metrics.UpdateFilter(newCfg.Telemetry.AllowedPrefixes, newCfg.Telemetry.BlockedPrefixes)
+	metrics.UpdateFilter(newCfg.TelemetryAllowedPrefixes, newCfg.TelemetryBlockedPrefixes)
 
 	return nil
 }

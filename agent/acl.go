@@ -7,6 +7,7 @@ import (
 
 	"github.com/armon/go-metrics"
 	"github.com/hashicorp/consul/acl"
+	"github.com/hashicorp/consul/agent/config"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/types"
 	"github.com/hashicorp/golang-lru"
@@ -67,7 +68,7 @@ type aclManager struct {
 }
 
 // newACLManager returns an ACL manager based on the given config.
-func newACLManager(config *Config) (*aclManager, error) {
+func newACLManager(config *config.RuntimeConfig) (*aclManager, error) {
 	// Set up the cache from ID to ACL (we don't cache policies like the
 	// servers; only one level).
 	acls, err := lru.New2Q(aclCacheSize)

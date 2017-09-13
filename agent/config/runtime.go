@@ -4,7 +4,12 @@ import (
 	"net"
 	"time"
 
+	"crypto/tls"
+
+	"github.com/hashicorp/consul/agent/consul"
 	"github.com/hashicorp/consul/agent/structs"
+	"github.com/hashicorp/consul/tlsutil"
+	"github.com/hashicorp/consul/types"
 	"golang.org/x/time/rate"
 )
 
@@ -17,6 +22,7 @@ type RuntimeConfig struct {
 	ACLDisabledTTL             time.Duration
 	CheckDeregisterIntervalMin time.Duration
 	CheckReapInterval          time.Duration
+	ConsulConfig               *consul.Config
 	SyncCoordinateRateTarget   float64
 	SyncCoordinateIntervalMin  time.Duration
 	Revision                   string
@@ -76,7 +82,8 @@ type RuntimeConfig struct {
 	TelemetryDogstatsdAddr                      string
 	TelemetryDogstatsdTags                      []string
 	TelemetryFilterDefault                      bool
-	TelemetryPrefixFilter                       []string
+	TelemetryAllowedPrefixes                    []string
+	TelemetryBlockedPrefixes                    []string
 	TelemetryStatsdAddr                         string
 	TelemetryStatsiteAddr                       string
 	TelemetryStatsitePrefix                     string
@@ -118,7 +125,7 @@ type RuntimeConfig struct {
 	KeyFile                     string
 	LeaveOnTerm                 bool
 	LogLevel                    string
-	NodeID                      string
+	NodeID                      types.NodeID
 	NodeMeta                    map[string]string
 	NodeName                    string
 	NonVotingServer             bool
@@ -143,8 +150,11 @@ type RuntimeConfig struct {
 	SerfAdvertiseAddrWAN        *net.TCPAddr
 	SerfBindAddrLAN             *net.TCPAddr
 	SerfBindAddrWAN             *net.TCPAddr
+	SerfPortLAN                 int
+	SerfPortWAN                 int
 	ServerMode                  bool
 	ServerName                  string
+	ServerPort                  int
 	Services                    []*structs.ServiceDefinition
 	SessionTTLMin               time.Duration
 	SkipLeaveOnInt              bool
@@ -166,4 +176,39 @@ type RuntimeConfig struct {
 	VerifyOutgoing              bool
 	VerifyServerHostname        bool
 	Watches                     []map[string]interface{}
+}
+
+// IncomingHTTPSConfig returns the TLS configuration for HTTPS
+// connections to consul.
+func (c *RuntimeConfig) IncomingHTTPSConfig() (*tls.Config, error) {
+	tc := &tlsutil.Config{
+		VerifyIncoming:           c.VerifyIncoming || c.VerifyIncomingHTTPS,
+		VerifyOutgoing:           c.VerifyOutgoing,
+		CAFile:                   c.CAFile,
+		CAPath:                   c.CAPath,
+		CertFile:                 c.CertFile,
+		KeyFile:                  c.KeyFile,
+		NodeName:                 c.NodeName,
+		ServerName:               c.ServerName,
+		TLSMinVersion:            c.TLSMinVersion,
+		CipherSuites:             c.TLSCipherSuites,
+		PreferServerCipherSuites: c.TLSPreferServerCipherSuites,
+	}
+	return tc.IncomingTLSConfig()
+}
+
+type ProtoAddr struct {
+	Proto, Net, Addr string
+}
+
+func (p ProtoAddr) String() string {
+	return p.Proto + "://" + p.Addr
+}
+
+func (c *RuntimeConfig) GetDNSAddrs() ([]ProtoAddr, error) {
+	return nil, nil
+}
+
+func (c *RuntimeConfig) GetHTTPAddrs() ([]ProtoAddr, error) {
+	return nil, nil
 }

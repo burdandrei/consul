@@ -472,6 +472,22 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		statsitePrefix = b.stringVal(c.DeprecatedStatsitePrefix)
 	}
 
+	// Parse the metric filters
+	var telemetryAllowedPrefixes, telemetryBlockedPrefixes []string
+	for _, rule := range c.Telemetry.PrefixFilter {
+		if rule == "" {
+			b.warn("Cannot have empty filter rule in prefix_filter")
+		}
+		switch rule[0] {
+		case '+':
+			telemetryAllowedPrefixes = append(telemetryAllowedPrefixes, rule[1:])
+		case '-':
+			telemetryBlockedPrefixes = append(telemetryBlockedPrefixes, rule[1:])
+		default:
+			b.warn("Filter rule must begin with either '+' or '-': %q", rule)
+		}
+	}
+
 	// patch deprecated retry-join-{gce,azure,ec2)-* parameters
 	// into -retry-join and issue warning.
 	if !reflect.DeepEqual(c.DeprecatedRetryJoinEC2, RetryJoinEC2{}) {
@@ -649,7 +665,8 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		TelemetryDogstatsdAddr:                      dogstatsdAddr,
 		TelemetryDogstatsdTags:                      dogstatsdTags,
 		TelemetryFilterDefault:                      b.boolVal(c.Telemetry.FilterDefault),
-		TelemetryPrefixFilter:                       c.Telemetry.PrefixFilter,
+		TelemetryAllowedPrefixes:                    telemetryAllowedPrefixes,
+		TelemetryBlockedPrefixes:                    telemetryBlockedPrefixes,
 		TelemetryStatsdAddr:                         statsdAddr,
 		TelemetryStatsiteAddr:                       statsiteAddr,
 		TelemetryStatsitePrefix:                     statsitePrefix,
@@ -685,7 +702,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		KeyFile:                     b.stringVal(c.KeyFile),
 		LeaveOnTerm:                 leaveOnTerm,
 		LogLevel:                    b.stringVal(c.LogLevel),
-		NodeID:                      b.stringVal(c.NodeID),
+		NodeID:                      types.NodeID(b.stringVal(c.NodeID)),
 		NodeMeta:                    c.NodeMeta,
 		NodeName:                    b.nodeName(c.NodeName),
 		NonVotingServer:             b.boolVal(c.NonVotingServer),
@@ -710,8 +727,11 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		SerfAdvertiseAddrWAN:        serfAdvertiseAddrWAN,
 		SerfBindAddrLAN:             serfBindAddrLAN,
 		SerfBindAddrWAN:             serfBindAddrWAN,
+		SerfPortLAN:                 serfPortLAN,
+		SerfPortWAN:                 serfPortWAN,
 		ServerMode:                  b.boolVal(c.ServerMode),
 		ServerName:                  b.stringVal(c.ServerName),
+		ServerPort:                  serverPort,
 		Services:                    services,
 		SessionTTLMin:               b.durationVal(c.SessionTTLMin),
 		SkipLeaveOnInt:              skipLeaveOnInt,

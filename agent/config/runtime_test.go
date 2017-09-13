@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/agent/structs"
+	"github.com/hashicorp/consul/types"
 	"github.com/pascaldekloe/goe/verify"
 )
 
@@ -1795,7 +1796,7 @@ func TestFullConfig(t *testing.T) {
 				"dogstatsd_addr": "0wSndumK",
 				"dogstatsd_tags": [ "3N81zSUB","Xtj8AnXZ" ],
 				"filter_default": true,
-				"prefix_filter": [ "oJotS8XJ","cazlEhGn" ],
+				"prefix_filter": [ "+oJotS8XJ","-cazlEhGn" ],
 				"statsd_address": "drce87cy",
 				"statsite_address": "HpFwKB8R",
 				"statsite_prefix": "ftO6DySn"
@@ -2217,7 +2218,7 @@ func TestFullConfig(t *testing.T) {
 				dogstatsd_addr = "0wSndumK"
 				dogstatsd_tags = [ "3N81zSUB","Xtj8AnXZ" ]
 				filter_default = true
-				prefix_filter = [ "oJotS8XJ","cazlEhGn" ]
+				prefix_filter = [ "+oJotS8XJ","-cazlEhGn" ]
 				statsd_address = "drce87cy"
 				statsite_address = "HpFwKB8R"
 				statsite_prefix = "ftO6DySn"
@@ -2406,7 +2407,7 @@ func TestFullConfig(t *testing.T) {
 		KeyFile:                   "IEkkwgIA",
 		LeaveOnTerm:               true,
 		LogLevel:                  "k1zo9Spt",
-		NodeID:                    "AsUIlw99",
+		NodeID:                    types.NodeID("AsUIlw99"),
 		NodeMeta:                  map[string]string{"5mgGQMBk": "mJLtVMSG", "A7ynFMJB": "0Nx6RGab"},
 		NodeName:                  "otlLxGaI",
 		NonVotingServer:           true,
@@ -2443,8 +2444,11 @@ func TestFullConfig(t *testing.T) {
 				Advertise:   "83.58.26.27",
 			},
 		},
-		ServerMode: true,
-		ServerName: "Oerr9n1G",
+		SerfPortLAN: 8301,
+		SerfPortWAN: 8302,
+		ServerMode:  true,
+		ServerName:  "Oerr9n1G",
+		ServerPort:  8300,
 		Services: []*structs.ServiceDefinition{
 			{
 				ID:                "wI1dzxS4",
@@ -2632,7 +2636,8 @@ func TestFullConfig(t *testing.T) {
 		TelemetryDogstatsdAddr:                      "0wSndumK",
 		TelemetryDogstatsdTags:                      []string{"3N81zSUB", "Xtj8AnXZ"},
 		TelemetryFilterDefault:                      true,
-		TelemetryPrefixFilter:                       []string{"oJotS8XJ", "cazlEhGn"},
+		TelemetryAllowedPrefixes:                    []string{"oJotS8XJ"},
+		TelemetryBlockedPrefixes:                    []string{"cazlEhGn"},
 		TelemetryStatsdAddr:                         "drce87cy",
 		TelemetryStatsiteAddr:                       "HpFwKB8R",
 		TelemetryStatsitePrefix:                     "ftO6DySn",

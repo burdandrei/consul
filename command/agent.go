@@ -17,6 +17,7 @@ import (
 	"github.com/armon/go-metrics/circonus"
 	"github.com/armon/go-metrics/datadog"
 	"github.com/hashicorp/consul/agent"
+	"github.com/hashicorp/consul/agent/config"
 	"github.com/hashicorp/consul/lib"
 	"github.com/hashicorp/consul/logger"
 	"github.com/hashicorp/go-checkpoint"
@@ -47,8 +48,8 @@ type AgentCommand struct {
 
 // readConfig is responsible for setup of our configuration using
 // the command line and any file configs
-func (cmd *AgentCommand) readConfig() *agent.Config {
-	var cmdCfg agent.Config
+func (cmd *AgentCommand) readConfig() *config.RuntimeConfig {
+	var cmdCfg config.RuntimeConfig
 	var cfgFiles []string
 	var retryInterval string
 	var retryIntervalWan string
@@ -910,7 +911,7 @@ func (cmd *AgentCommand) run(args []string) int {
 }
 
 // handleReload is invoked when we should reload our configs, e.g. SIGHUP
-func (cmd *AgentCommand) handleReload(agent *agent.Agent, cfg *agent.Config) (*agent.Config, error) {
+func (cmd *AgentCommand) handleReload(agent *agent.Agent, cfg *config.RuntimeConfig) (*config.RuntimeConfig, error) {
 	cmd.logger.Println("[INFO] Reloading configuration...")
 	var errs error
 	newCfg := cmd.readConfig()
