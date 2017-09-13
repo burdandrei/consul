@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -22,28 +23,37 @@ import (
 // should check one option at a time if possible and should use generic
 // values, e.g. 'a' or 1 instead of 'servicex' or 3306.
 
-func ipAddr(addr string) *net.IPAddr {
-	a, err := net.ResolveIPAddr("ip", addr)
+func splitIPPort(hostport string) (net.IP, int) {
+	h, p, err := net.SplitHostPort(hostport)
 	if err != nil {
 		panic(err)
 	}
-	return a
+	port, err := strconv.Atoi(p)
+	if err != nil {
+		panic(err)
+	}
+	return net.ParseIP(h), port
+}
+
+func ipAddr(addr string) *net.IPAddr {
+	return &net.IPAddr{IP: net.ParseIP(addr)}
 }
 
 func tcpAddr(addr string) *net.TCPAddr {
-	a, err := net.ResolveTCPAddr("tcp", addr)
-	if err != nil {
-		panic(err)
-	}
-	return a
+	ip, port := splitIPPort(addr)
+	return &net.TCPAddr{IP: ip, Port: port}
+}
+
+func udpAddr(addr string) *net.UDPAddr {
+	ip, port := splitIPPort(addr)
+	return &net.UDPAddr{IP: ip, Port: port}
 }
 
 func unixAddr(addr string) *net.UnixAddr {
-	a, err := net.ResolveUnixAddr("unix", addr[len("unix://"):])
-	if err != nil {
-		panic(err)
+	if !strings.HasPrefix(addr, "unix://") {
+		panic("not a unix socket addr: " + addr)
 	}
-	return a
+	return &net.UnixAddr{Net: "unix", Name: addr[len("unix://"):]}
 }
 
 func TestConfigFlagsAndEdgecases(t *testing.T) {
@@ -155,7 +165,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			flags: []string{`-client`, `1.2.3.4`},
 			patch: func(rt *RuntimeConfig) {
 				rt.ClientAddrs = []*net.IPAddr{ipAddr("1.2.3.4")}
-				rt.DNSAddrs = []net.Addr{tcpAddr("1.2.3.4:8600")}
+				rt.DNSAddrs = []net.Addr{tcpAddr("1.2.3.4:8600"), udpAddr("1.2.3.4:8600")}
 				rt.HTTPAddrs = []net.Addr{tcpAddr("1.2.3.4:8500")}
 			},
 		},
@@ -199,7 +209,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			flags: []string{`-dns-port`, `123`},
 			patch: func(rt *RuntimeConfig) {
 				rt.DNSPort = 123
-				rt.DNSAddrs = []net.Addr{tcpAddr("127.0.0.1:123")}
+				rt.DNSAddrs = []net.Addr{tcpAddr("127.0.0.1:123"), udpAddr("127.0.0.1:123")}
 			},
 		},
 		{
@@ -706,7 +716,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				`},
 			patch: func(rt *RuntimeConfig) {
 				rt.ClientAddrs = []*net.IPAddr{ipAddr("0.0.0.0")}
-				rt.DNSAddrs = []net.Addr{tcpAddr("0.0.0.0:8600")}
+				rt.DNSAddrs = []net.Addr{tcpAddr("0.0.0.0:8600"), udpAddr("0.0.0.0:8600")}
 				rt.HTTPAddrs = []net.Addr{tcpAddr("0.0.0.0:8500")}
 			},
 		},
@@ -759,7 +769,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.ClientAddrs = []*net.IPAddr{ipAddr("0.0.0.0")}
 				rt.DNSPort = 1
-				rt.DNSAddrs = []net.Addr{tcpAddr("0.0.0.0:1")}
+				rt.DNSAddrs = []net.Addr{tcpAddr("0.0.0.0:1"), udpAddr("0.0.0.0:1")}
 				rt.HTTPPort = 2
 				rt.HTTPAddrs = []net.Addr{tcpAddr("0.0.0.0:2")}
 				rt.HTTPSPort = 3
@@ -781,7 +791,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				`},
 			patch: func(rt *RuntimeConfig) {
 				rt.ClientAddrs = []*net.IPAddr{ipAddr("0.0.0.0")}
-				rt.DNSAddrs = []net.Addr{tcpAddr("1.1.1.1:8600")}
+				rt.DNSAddrs = []net.Addr{tcpAddr("1.1.1.1:8600"), udpAddr("1.1.1.1:8600")}
 				rt.HTTPAddrs = []net.Addr{tcpAddr("2.2.2.2:8500")}
 			},
 		},
@@ -820,7 +830,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.ClientAddrs = []*net.IPAddr{ipAddr("0.0.0.0")}
 				rt.DNSPort = 1
-				rt.DNSAddrs = []net.Addr{tcpAddr("1.1.1.1:1")}
+				rt.DNSAddrs = []net.Addr{tcpAddr("1.1.1.1:1"), udpAddr("1.1.1.1:1")}
 				rt.HTTPPort = 2
 				rt.HTTPAddrs = []net.Addr{tcpAddr("2.2.2.2:2")}
 				rt.HTTPSPort = 3
@@ -840,7 +850,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.ClientAddrs = []*net.IPAddr{ipAddr("1.2.3.4"), ipAddr("2001:db8::1")}
 				rt.DNSPort = 1
-				rt.DNSAddrs = []net.Addr{tcpAddr("1.2.3.4:1"), tcpAddr("[2001:db8::1]:1")}
+				rt.DNSAddrs = []net.Addr{tcpAddr("1.2.3.4:1"), tcpAddr("[2001:db8::1]:1"), udpAddr("1.2.3.4:1"), udpAddr("[2001:db8::1]:1")}
 				rt.HTTPPort = 2
 				rt.HTTPAddrs = []net.Addr{tcpAddr("1.2.3.4:2"), tcpAddr("[2001:db8::1]:2")}
 				rt.HTTPSPort = 3
@@ -870,7 +880,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.ClientAddrs = []*net.IPAddr{ipAddr("1.2.3.4"), ipAddr("2001:db8::1")}
 				rt.DNSPort = 1
-				rt.DNSAddrs = []net.Addr{tcpAddr("1.1.1.1:1"), unixAddr("unix://dns"), tcpAddr("[2001:db8::10]:1")}
+				rt.DNSAddrs = []net.Addr{tcpAddr("1.1.1.1:1"), unixAddr("unix://dns"), tcpAddr("[2001:db8::10]:1"), udpAddr("1.1.1.1:1"), udpAddr("[2001:db8::10]:1")}
 				rt.HTTPPort = 2
 				rt.HTTPAddrs = []net.Addr{tcpAddr("2.2.2.2:2"), unixAddr("unix://http"), tcpAddr("[2001:db8::20]:2")}
 				rt.HTTPSPort = 3
@@ -2368,7 +2378,7 @@ func TestFullConfig(t *testing.T) {
 		},
 		CheckUpdateInterval:       16507 * time.Second,
 		ClientAddrs:               []*net.IPAddr{ipAddr("93.83.18.19")},
-		DNSAddrs:                  []net.Addr{tcpAddr("93.95.95.81:7001")},
+		DNSAddrs:                  []net.Addr{tcpAddr("93.95.95.81:7001"), udpAddr("93.95.95.81:7001")},
 		DNSAllowStale:             true,
 		DNSDisableCompression:     true,
 		DNSDomain:                 "7W1xXSqd",

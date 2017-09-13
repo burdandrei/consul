@@ -380,6 +380,12 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	httpAddrs := b.makeAddrs(b.expandAddrs("addresses.http", c.Addresses.HTTP), clientAddrs, httpPort)
 	httpsAddrs := b.makeAddrs(b.expandAddrs("addresses.https", c.Addresses.HTTPS), clientAddrs, httpsPort)
 
+	for _, a := range dnsAddrs {
+		if x, ok := a.(*net.TCPAddr); ok {
+			dnsAddrs = append(dnsAddrs, &net.UDPAddr{IP: x.IP, Port: x.Port})
+		}
+	}
+
 	// segments
 	var segments []structs.NetworkSegment
 	for _, s := range c.Segments {
@@ -865,9 +871,9 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 	// todo(fs): check serf and rpc advertise/bind addresses for uniqueness as well
 	usage := map[string]string{}
 	uniqueAddr := func(name string, addr net.Addr) error {
-		key := addr.String()
+		key := addr.Network() + ":" + addr.String()
 		if other, inuse := usage[key]; inuse {
-			return fmt.Errorf("%s address %s already configured for %s", name, key, other)
+			return fmt.Errorf("%s address %s already configured for %s", name, addr.String(), other)
 		}
 		usage[key] = name
 		return nil
