@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"reflect"
 	"strings"
 	"testing"
@@ -19,6 +20,30 @@ import (
 // checks for warnings on deprecated fields and flags.  These tests
 // should check one option at a time if possible and should use generic
 // values, e.g. 'a' or 1 instead of 'servicex' or 3306.
+
+func ipAddr(addr string) *net.IPAddr {
+	a, err := net.ResolveIPAddr("ip", addr)
+	if err != nil {
+		panic(err)
+	}
+	return a
+}
+
+func tcpAddr(addr string) *net.TCPAddr {
+	a, err := net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+		panic(err)
+	}
+	return a
+}
+
+func unixAddr(addr string) *net.UnixAddr {
+	a, err := net.ResolveUnixAddr("unix", addr[len("unix://"):])
+	if err != nil {
+		panic(err)
+	}
+	return a
+}
 
 func TestConfigFlagsAndEdgecases(t *testing.T) {
 	randomString := func(n int) string {
@@ -67,23 +92,39 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 
 		{
 			desc:  "-advertise",
-			flags: []string{`-advertise`, `a`},
+			flags: []string{`-advertise`, `1.2.3.4`},
 			patch: func(rt *RuntimeConfig) {
-				rt.AdvertiseAddrLAN = "a"
+				rt.AdvertiseAddrLAN = tcpAddr("1.2.3.4:8300")
+				rt.AdvertiseAddrWAN = tcpAddr("1.2.3.4:8300")
 			},
 		},
 		{
 			desc:  "-advertise-wan",
-			flags: []string{`-advertise-wan`, `a`},
+			flags: []string{`-advertise-wan`, `1.2.3.4`},
 			patch: func(rt *RuntimeConfig) {
-				rt.AdvertiseAddrWAN = "a"
+				rt.AdvertiseAddrWAN = tcpAddr("1.2.3.4:8300")
+			},
+		},
+		{
+			desc:  "-advertise and -advertise-wan",
+			flags: []string{`-advertise`, `1.2.3.4`, `-advertise-wan`, `5.6.7.8`},
+			patch: func(rt *RuntimeConfig) {
+				rt.AdvertiseAddrLAN = tcpAddr("1.2.3.4:8300")
+				rt.AdvertiseAddrWAN = tcpAddr("5.6.7.8:8300")
 			},
 		},
 		{
 			desc:  "-bind",
 			flags: []string{`-bind`, `1.2.3.4`},
 			patch: func(rt *RuntimeConfig) {
-				rt.BindAddrs = []string{"1.2.3.4"}
+				rt.BindAddr = ipAddr("1.2.3.4")
+				rt.SerfBindAddrLAN = tcpAddr("1.2.3.4:8301")
+				rt.SerfBindAddrWAN = tcpAddr("1.2.3.4:8302")
+				rt.AdvertiseAddrLAN = tcpAddr("1.2.3.4:8300")
+				rt.AdvertiseAddrWAN = tcpAddr("1.2.3.4:8300")
+				rt.RPCAdvertiseAddr = tcpAddr("1.2.3.4:8300")
+				rt.SerfAdvertiseAddrLAN = tcpAddr("1.2.3.4:8301")
+				rt.SerfAdvertiseAddrWAN = tcpAddr("1.2.3.4:8302")
 			},
 		},
 		{
@@ -112,9 +153,9 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			desc:  "-client",
 			flags: []string{`-client`, `1.2.3.4`},
 			patch: func(rt *RuntimeConfig) {
-				rt.ClientAddrs = []string{"1.2.3.4"}
-				rt.DNSAddrs = []string{"1.2.3.4:8600"}
-				rt.HTTPAddrs = []string{"1.2.3.4:8500"}
+				rt.ClientAddrs = []*net.IPAddr{ipAddr("1.2.3.4")}
+				rt.DNSAddrs = []net.Addr{tcpAddr("1.2.3.4:8600")}
+				rt.HTTPAddrs = []net.Addr{tcpAddr("1.2.3.4:8500")}
 			},
 		},
 		{
@@ -157,7 +198,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			flags: []string{`-dns-port`, `123`},
 			patch: func(rt *RuntimeConfig) {
 				rt.DNSPort = 123
-				rt.DNSAddrs = []string{"127.0.0.1:123"}
+				rt.DNSAddrs = []net.Addr{tcpAddr("127.0.0.1:123")}
 			},
 		},
 		{
@@ -186,7 +227,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			flags: []string{`-http-port`, `123`},
 			patch: func(rt *RuntimeConfig) {
 				rt.HTTPPort = 123
-				rt.HTTPAddrs = []string{"127.0.0.1:123"}
+				rt.HTTPAddrs = []net.Addr{tcpAddr("127.0.0.1:123")}
 			},
 		},
 		{
@@ -317,16 +358,16 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		},
 		{
 			desc:  "-serf-lan-bind",
-			flags: []string{`-serf-lan-bind`, `a`},
+			flags: []string{`-serf-lan-bind`, `1.2.3.4`},
 			patch: func(rt *RuntimeConfig) {
-				rt.SerfBindAddrLAN = "a"
+				rt.SerfBindAddrLAN = tcpAddr("1.2.3.4:8301")
 			},
 		},
 		{
 			desc:  "-serf-wan-bind",
-			flags: []string{`-serf-wan-bind`, `a`},
+			flags: []string{`-serf-wan-bind`, `1.2.3.4`},
 			patch: func(rt *RuntimeConfig) {
-				rt.SerfBindAddrWAN = "a"
+				rt.SerfBindAddrWAN = tcpAddr("1.2.3.4:8302")
 			},
 		},
 		{
@@ -663,9 +704,9 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					ports {}
 				`},
 			patch: func(rt *RuntimeConfig) {
-				rt.ClientAddrs = []string{"0.0.0.0"}
-				rt.DNSAddrs = []string{":8600"}
-				rt.HTTPAddrs = []string{":8500"}
+				rt.ClientAddrs = []*net.IPAddr{ipAddr("0.0.0.0")}
+				rt.DNSAddrs = []net.Addr{tcpAddr("0.0.0.0:8600")}
+				rt.HTTPAddrs = []net.Addr{tcpAddr("0.0.0.0:8500")}
 			},
 		},
 		{
@@ -679,11 +720,11 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					ports { dns = -1 http = -2 https = -3 }
 				`},
 			patch: func(rt *RuntimeConfig) {
-				rt.ClientAddrs = []string{"0.0.0.0"}
-				rt.DNSPort = 0
-				rt.DNSAddrs = []string{}
-				rt.HTTPPort = 0
-				rt.HTTPAddrs = []string{}
+				rt.ClientAddrs = []*net.IPAddr{ipAddr("0.0.0.0")}
+				rt.DNSPort = -1
+				rt.DNSAddrs = nil
+				rt.HTTPPort = -1
+				rt.HTTPAddrs = nil
 			},
 		},
 		{
@@ -697,11 +738,11 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					ports { dns = -1 http = -2 https = -3 }
 				`},
 			patch: func(rt *RuntimeConfig) {
-				rt.ClientAddrs = []string{"0.0.0.0"}
-				rt.DNSPort = 0
-				rt.DNSAddrs = []string{}
-				rt.HTTPPort = 0
-				rt.HTTPAddrs = []string{}
+				rt.ClientAddrs = []*net.IPAddr{ipAddr("0.0.0.0")}
+				rt.DNSPort = -1
+				rt.DNSAddrs = nil
+				rt.HTTPPort = -1
+				rt.HTTPAddrs = nil
 			},
 		},
 		{
@@ -715,13 +756,13 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					ports { dns = 1 http = 2 https = 3 }
 				`},
 			patch: func(rt *RuntimeConfig) {
-				rt.ClientAddrs = []string{"0.0.0.0"}
+				rt.ClientAddrs = []*net.IPAddr{ipAddr("0.0.0.0")}
 				rt.DNSPort = 1
-				rt.DNSAddrs = []string{":1"}
+				rt.DNSAddrs = []net.Addr{tcpAddr("0.0.0.0:1")}
 				rt.HTTPPort = 2
-				rt.HTTPAddrs = []string{":2"}
+				rt.HTTPAddrs = []net.Addr{tcpAddr("0.0.0.0:2")}
 				rt.HTTPSPort = 3
-				rt.HTTPSAddrs = []string{":3"}
+				rt.HTTPSAddrs = []net.Addr{tcpAddr("0.0.0.0:3")}
 			},
 		},
 
@@ -738,9 +779,9 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					ports {}
 				`},
 			patch: func(rt *RuntimeConfig) {
-				rt.ClientAddrs = []string{"0.0.0.0"}
-				rt.DNSAddrs = []string{"1.1.1.1:8600"}
-				rt.HTTPAddrs = []string{"2.2.2.2:8500"}
+				rt.ClientAddrs = []*net.IPAddr{ipAddr("0.0.0.0")}
+				rt.DNSAddrs = []net.Addr{tcpAddr("1.1.1.1:8600")}
+				rt.HTTPAddrs = []net.Addr{tcpAddr("2.2.2.2:8500")}
 			},
 		},
 		{
@@ -756,11 +797,11 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					ports { dns = -1 http = -2 https = -3 }
 				`},
 			patch: func(rt *RuntimeConfig) {
-				rt.ClientAddrs = []string{"0.0.0.0"}
-				rt.DNSPort = 0
-				rt.DNSAddrs = []string{}
-				rt.HTTPPort = 0
-				rt.HTTPAddrs = []string{}
+				rt.ClientAddrs = []*net.IPAddr{ipAddr("0.0.0.0")}
+				rt.DNSPort = -1
+				rt.DNSAddrs = nil
+				rt.HTTPPort = -1
+				rt.HTTPAddrs = nil
 			},
 		},
 		{
@@ -776,13 +817,13 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					ports { dns = 1 http = 2 https = 3 }
 				`},
 			patch: func(rt *RuntimeConfig) {
-				rt.ClientAddrs = []string{"0.0.0.0"}
+				rt.ClientAddrs = []*net.IPAddr{ipAddr("0.0.0.0")}
 				rt.DNSPort = 1
-				rt.DNSAddrs = []string{"1.1.1.1:1"}
+				rt.DNSAddrs = []net.Addr{tcpAddr("1.1.1.1:1")}
 				rt.HTTPPort = 2
-				rt.HTTPAddrs = []string{"2.2.2.2:2"}
+				rt.HTTPAddrs = []net.Addr{tcpAddr("2.2.2.2:2")}
 				rt.HTTPSPort = 3
-				rt.HTTPSAddrs = []string{"3.3.3.3:3"}
+				rt.HTTPSAddrs = []net.Addr{tcpAddr("3.3.3.3:3")}
 			},
 		},
 		{
@@ -796,19 +837,19 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					ports { dns = 1 http = 2 https = 3 }
 				`},
 			patch: func(rt *RuntimeConfig) {
-				rt.ClientAddrs = []string{"1.2.3.4", "2001:db8::1"}
+				rt.ClientAddrs = []*net.IPAddr{ipAddr("1.2.3.4"), ipAddr("2001:db8::1")}
 				rt.DNSPort = 1
-				rt.DNSAddrs = []string{"1.2.3.4:1", "[2001:db8::1]:1"}
+				rt.DNSAddrs = []net.Addr{tcpAddr("1.2.3.4:1"), tcpAddr("[2001:db8::1]:1")}
 				rt.HTTPPort = 2
-				rt.HTTPAddrs = []string{"1.2.3.4:2", "[2001:db8::1]:2"}
+				rt.HTTPAddrs = []net.Addr{tcpAddr("1.2.3.4:2"), tcpAddr("[2001:db8::1]:2")}
 				rt.HTTPSPort = 3
-				rt.HTTPSAddrs = []string{"1.2.3.4:3", "[2001:db8::1]:3"}
+				rt.HTTPSAddrs = []net.Addr{tcpAddr("1.2.3.4:3"), tcpAddr("[2001:db8::1]:3")}
 			},
 		},
 		{
 			desc: "client, address template and ports",
 			json: []string{`{
-					"client_addr": "{{ printf \"1.2.3.4 unix://foo 2001:db8::1\" }}",
+					"client_addr": "{{ printf \"1.2.3.4 2001:db8::1\" }}",
 					"addresses": {
 						"dns": "{{ printf \"1.1.1.1 unix://dns 2001:db8::10 \" }}",
 						"http": "{{ printf \"2.2.2.2 unix://http 2001:db8::20 \" }}",
@@ -817,7 +858,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					"ports":{ "dns":1, "http":2, "https":3 }
 				}`},
 			hcl: []string{`
-					client_addr = "{{ printf \"1.2.3.4 unix://foo 2001:db8::1\" }}"
+					client_addr = "{{ printf \"1.2.3.4 2001:db8::1\" }}"
 					addresses = {
 						dns = "{{ printf \"1.1.1.1 unix://dns 2001:db8::10 \" }}"
 						http = "{{ printf \"2.2.2.2 unix://http 2001:db8::20 \" }}"
@@ -826,13 +867,13 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					ports { dns = 1 http = 2 https = 3 }
 				`},
 			patch: func(rt *RuntimeConfig) {
-				rt.ClientAddrs = []string{"1.2.3.4", "unix://foo", "2001:db8::1"}
+				rt.ClientAddrs = []*net.IPAddr{ipAddr("1.2.3.4"), ipAddr("2001:db8::1")}
 				rt.DNSPort = 1
-				rt.DNSAddrs = []string{"1.1.1.1:1", "unix://dns", "[2001:db8::10]:1"}
+				rt.DNSAddrs = []net.Addr{tcpAddr("1.1.1.1:1"), unixAddr("unix://dns"), tcpAddr("[2001:db8::10]:1")}
 				rt.HTTPPort = 2
-				rt.HTTPAddrs = []string{"2.2.2.2:2", "unix://http", "[2001:db8::20]:2"}
+				rt.HTTPAddrs = []net.Addr{tcpAddr("2.2.2.2:2"), unixAddr("unix://http"), tcpAddr("[2001:db8::20]:2")}
 				rt.HTTPSPort = 3
-				rt.HTTPSAddrs = []string{"3.3.3.3:3", "unix://https", "[2001:db8::30]:3"}
+				rt.HTTPSAddrs = []net.Addr{tcpAddr("3.3.3.3:3"), unixAddr("unix://https"), tcpAddr("[2001:db8::30]:3")}
 			},
 		},
 		{
@@ -840,7 +881,8 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			json: []string{`{ "advertise_addr": "{{ printf \"1.2.3.4\" }}" }`},
 			hcl:  []string{`advertise_addr = "{{ printf \"1.2.3.4\" }}"`},
 			patch: func(rt *RuntimeConfig) {
-				rt.AdvertiseAddrLAN = "1.2.3.4"
+				rt.AdvertiseAddrLAN = tcpAddr("1.2.3.4:8300")
+				rt.AdvertiseAddrWAN = tcpAddr("1.2.3.4:8300")
 			},
 		},
 		{
@@ -848,7 +890,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			json: []string{`{ "advertise_addr_wan": "{{ printf \"1.2.3.4\" }}" }`},
 			hcl:  []string{`advertise_addr_wan = "{{ printf \"1.2.3.4\" }}"`},
 			patch: func(rt *RuntimeConfig) {
-				rt.AdvertiseAddrWAN = "1.2.3.4"
+				rt.AdvertiseAddrWAN = tcpAddr("1.2.3.4:8300")
 			},
 		},
 		{
@@ -856,7 +898,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			json: []string{`{ "advertise_addrs": { "serf_lan": "{{ printf \"1.2.3.4\" }}" } }`},
 			hcl:  []string{`advertise_addrs = { serf_lan = "{{ printf \"1.2.3.4\" }}" }`},
 			patch: func(rt *RuntimeConfig) {
-				rt.SerfAdvertiseAddrLAN = "1.2.3.4"
+				rt.SerfAdvertiseAddrLAN = tcpAddr("1.2.3.4:8301")
 			},
 		},
 		{
@@ -864,7 +906,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			json: []string{`{ "advertise_addrs": { "serf_wan": "{{ printf \"1.2.3.4\" }}" } }`},
 			hcl:  []string{`advertise_addrs = { serf_wan = "{{ printf \"1.2.3.4\" }}" }`},
 			patch: func(rt *RuntimeConfig) {
-				rt.SerfAdvertiseAddrWAN = "1.2.3.4"
+				rt.SerfAdvertiseAddrWAN = tcpAddr("1.2.3.4:8302")
 			},
 		},
 		{
@@ -872,7 +914,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			json: []string{`{ "serf_lan": "{{ printf \"1.2.3.4\" }}" }`},
 			hcl:  []string{`serf_lan = "{{ printf \"1.2.3.4\" }}"`},
 			patch: func(rt *RuntimeConfig) {
-				rt.SerfBindAddrLAN = "1.2.3.4"
+				rt.SerfBindAddrLAN = tcpAddr("1.2.3.4:8301")
 			},
 		},
 		{
@@ -880,7 +922,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			json: []string{`{ "serf_wan": "{{ printf \"1.2.3.4\" }}" }`},
 			hcl:  []string{`serf_wan = "{{ printf \"1.2.3.4\" }}"`},
 			patch: func(rt *RuntimeConfig) {
-				rt.SerfBindAddrWAN = "1.2.3.4"
+				rt.SerfBindAddrWAN = tcpAddr("1.2.3.4:8302")
 			},
 		},
 
@@ -961,25 +1003,25 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					`,
 			},
 			flags: []string{
-				`-advertise`, `b`,
-				`-advertise-wan`, `b`,
+				`-advertise`, `1.1.1.1`,
+				`-advertise-wan`, `2.2.2.2`,
 				`-bootstrap=false`,
 				`-bootstrap-expect=0`,
 				`-datacenter=b`,
 				`-join`, `c`, `-join`, `d`,
 				`-node-meta`, `c:d`,
 				`-recursor`, `c`, `-recursor`, `d`,
-				`-serf-lan-bind`, `b`,
-				`-serf-wan-bind`, `b`,
+				`-serf-lan-bind`, `3.3.3.3`,
+				`-serf-wan-bind`, `4.4.4.4`,
 			},
 			patch: func(rt *RuntimeConfig) {
-				rt.AdvertiseAddrLAN = "b"
-				rt.AdvertiseAddrWAN = "b"
+				rt.AdvertiseAddrLAN = tcpAddr("1.1.1.1:8300")
+				rt.AdvertiseAddrWAN = tcpAddr("2.2.2.2:8300")
 				rt.Datacenter = "b"
 				rt.DNSRecursors = []string{"c", "d", "a", "b"}
 				rt.NodeMeta = map[string]string{"c": "d"}
-				rt.SerfBindAddrLAN = "b"
-				rt.SerfBindAddrWAN = "b"
+				rt.SerfBindAddrLAN = tcpAddr("3.3.3.3:8301")
+				rt.SerfBindAddrWAN = tcpAddr("4.4.4.4:8302")
 				rt.StartJoinAddrsLAN = []string{"c", "d", "a", "b"}
 			},
 		},
@@ -1073,43 +1115,86 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr": "0.0.0.0" }`},
 			hcl:   []string{`advertise_addr = "0.0.0.0"`},
-			err:   errors.New("Advertise address cannot be 0.0.0.0"),
+			err:   errors.New("Advertise address cannot be 0.0.0.0, :: or [::]"),
 		},
 		{
 			desc:  "advertise_addr ipv6 any",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr": "::" }`},
 			hcl:   []string{`advertise_addr = "::"`},
-			err:   errors.New("Advertise address cannot be ::"),
+			err:   errors.New("Advertise address cannot be 0.0.0.0, :: or [::]"),
 		},
 		{
 			desc:  "advertise_addr ipv6 any brackets",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr": "[::]" }`},
 			hcl:   []string{`advertise_addr = "[::]"`},
-			err:   errors.New("Advertise address cannot be [::]"),
+			err:   errors.New("Advertise address cannot be 0.0.0.0, :: or [::]"),
 		},
 		{
 			desc:  "advertise_addr_wan ipv4 any",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr_wan": "0.0.0.0" }`},
 			hcl:   []string{`advertise_addr_wan = "0.0.0.0"`},
-			err:   errors.New("Advertise WAN address cannot be 0.0.0.0"),
+			err:   errors.New("Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
 		},
 		{
 			desc:  "advertise_addr_wan ipv6 any",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr_wan": "::" }`},
 			hcl:   []string{`advertise_addr_wan = "::"`},
-			err:   errors.New("Advertise WAN address cannot be ::"),
+			err:   errors.New("Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
 		},
 		{
 			desc:  "advertise_addr_wan ipv6 any brackets",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr_wan": "[::]" }`},
 			hcl:   []string{`advertise_addr_wan = "[::]"`},
-			err:   errors.New("Advertise WAN address cannot be [::]"),
+			err:   errors.New("Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
 		},
+		{
+			desc:  "advertise_addrs.serf_lan ipv4 any",
+			flags: []string{`-datacenter=a`},
+			json:  []string{`{ "advertise_addrs":{ "serf_lan": "0.0.0.0" } }`},
+			hcl:   []string{`advertise_addrs = { serf_lan = "0.0.0.0" }`},
+			err:   errors.New("Serf Advertise LAN address cannot be 0.0.0.0, :: or [::]"),
+		},
+		{
+			desc:  "advertise_addrs.serf_lan ipv4 any",
+			flags: []string{`-datacenter=a`},
+			json:  []string{`{ "advertise_addrs":{ "serf_lan": "::" } }`},
+			hcl:   []string{`advertise_addrs = { serf_lan = "::" }`},
+			err:   errors.New("Serf Advertise LAN address cannot be 0.0.0.0, :: or [::]"),
+		},
+		{
+			desc:  "advertise_addrs.serf_lan ipv4 any",
+			flags: []string{`-datacenter=a`},
+			json:  []string{`{ "advertise_addrs":{ "serf_lan": "[::]" } }`},
+			hcl:   []string{`advertise_addrs = { serf_lan = "[::]" }`},
+			err:   errors.New("Serf Advertise LAN address cannot be 0.0.0.0, :: or [::]"),
+		},
+		{
+			desc:  "advertise_addrs.serf_wan ipv4 any",
+			flags: []string{`-datacenter=a`},
+			json:  []string{`{ "advertise_addrs":{ "serf_wan": "0.0.0.0" } }`},
+			hcl:   []string{`advertise_addrs = { serf_wan = "0.0.0.0" }`},
+			err:   errors.New("Serf Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
+		},
+		{
+			desc:  "advertise_addrs.serf_wan ipv4 any",
+			flags: []string{`-datacenter=a`},
+			json:  []string{`{ "advertise_addrs":{ "serf_wan": "::" } }`},
+			hcl:   []string{`advertise_addrs = { serf_wan = "::" }`},
+			err:   errors.New("Serf Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
+		},
+		{
+			desc:  "advertise_addrs.serf_wan ipv4 any",
+			flags: []string{`-datacenter=a`},
+			json:  []string{`{ "advertise_addrs":{ "serf_wan": "[::]" } }`},
+			hcl:   []string{`advertise_addrs = { serf_wan = "[::]" }`},
+			err:   errors.New("Serf Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
+		},
+		//todo(fs): rpc advertise any addr
 		{
 			desc:  "dns_config.udp_answer_limit invalid",
 			flags: []string{`-datacenter=a`},
@@ -1262,9 +1347,11 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 
 				// create the builder with the flags
 				b := &Builder{
-					Flags:    flags,
-					Default:  &defaultConfig,
-					Hostname: hostnameFn,
+					Flags:       flags,
+					Default:     &defaultConfig,
+					Hostname:    hostnameFn,
+					PrivateIPv4: func() (*net.IPAddr, error) { return ipAddr("10.0.0.1"), nil },
+					PublicIPv6:  func() (*net.IPAddr, error) { return ipAddr("2001:db8:1000"), nil },
 				}
 				if flags.DevMode != nil && *flags.DevMode {
 					b.Default = &defaultDevConfig
@@ -1297,7 +1384,12 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 
 				// build the runtime config we expect
 				// from the same default config and patch it
-				x := &Builder{Default: b.Default, Hostname: b.Hostname}
+				x := &Builder{
+					Default:     b.Default,
+					Hostname:    b.Hostname,
+					PrivateIPv4: b.PrivateIPv4,
+					PublicIPv6:  b.PublicIPv6,
+				}
 				wantRT, err := x.Build()
 				if err != nil {
 					t.Fatalf("build default failed: %s", err)
@@ -1346,17 +1438,17 @@ func TestFullConfig(t *testing.T) {
 			"acl_token": "O1El0wan",
 			"acl_ttl": "18060s",
 			"addresses": {
-				"dns": "kEtdOtsn",
-				"http": "uCOhLXzi",
-				"https": "z4j7tmn2",
+				"dns": "93.95.95.81",
+				"http": "83.39.91.39",
+				"https": "95.17.17.19",
 				"rpc": "ZIkSmEPN"
 			},
-			"advertise_addr": "zkCS5pci",
-			"advertise_addr_wan": "587rk4R8",
+			"advertise_addr": "17.99.29.16",
+			"advertise_addr_wan": "78.63.37.19",
 			"advertise_addrs": {
-				"rpc": "6dJYROsv",
-				"serf_lan": "XPYfEKBY",
-				"serf_wan": "53wnhkCC"
+				"rpc": "28.27.94.38",
+				"serf_lan": "49.38.36.95",
+				"serf_wan": "63.38.52.13"
 			},
 			"autopilot": {
 				"cleanup_dead_servers": true,
@@ -1367,7 +1459,7 @@ func TestFullConfig(t *testing.T) {
 				"server_stabilization_time": "23057s",
 				"upgrade_version_tag": "W9pDwFAL"
 			},
-			"bind_addr": "6rFPKyh6",
+			"bind_addr": "16.99.34.17",
 			"bootstrap": true,
 			"bootstrap_expect": 53,
 			"ca_file": "erA7T0PM",
@@ -1445,7 +1537,7 @@ func TestFullConfig(t *testing.T) {
 				}
 			],
 			"check_update_interval": "16507s",
-			"client_addr": "e15dFavQ",
+			"client_addr": "93.83.18.19",
 			"data_dir": "oTOOIoV9",
 			"datacenter": "rzo029wg",
 			"disable_anonymous_signature": true,
@@ -1537,8 +1629,8 @@ func TestFullConfig(t *testing.T) {
 					"advertise": "wHQJBv9R"
 				}
 			],
-			"serf_lan": "bdJGdMtR",
-			"serf_wan": "rSfygrZH",
+			"serf_lan": "99.43.63.15",
+			"serf_wan": "67.88.33.19",
 			"server": true,
 			"server_name": "Oerr9n1G",
 			"service": {
@@ -1768,17 +1860,17 @@ func TestFullConfig(t *testing.T) {
 			acl_token = "O1El0wan"
 			acl_ttl = "18060s"
 			addresses = {
-				dns = "kEtdOtsn"
-				http = "uCOhLXzi"
-				https = "z4j7tmn2"
+				dns = "93.95.95.81"
+				http = "83.39.91.39"
+				https = "95.17.17.19"
 				rpc = "ZIkSmEPN"
 			}
-			advertise_addr = "zkCS5pci"
-			advertise_addr_wan = "587rk4R8"
+			advertise_addr = "17.99.29.16"
+			advertise_addr_wan = "78.63.37.19"
 			advertise_addrs = {
-				rpc = "6dJYROsv"
-				serf_lan = "XPYfEKBY"
-				serf_wan = "53wnhkCC"
+				rpc = "28.27.94.38"
+				serf_lan = "49.38.36.95"
+				serf_wan = "63.38.52.13"
 			}
 			autopilot = {
 				cleanup_dead_servers = true
@@ -1789,7 +1881,7 @@ func TestFullConfig(t *testing.T) {
 				server_stabilization_time = "23057s"
 				upgrade_version_tag = "W9pDwFAL"
 			}
-			bind_addr = "6rFPKyh6"
+			bind_addr = "16.99.34.17"
 			bootstrap = true
 			bootstrap_expect = 53
 			ca_file = "erA7T0PM"
@@ -1867,7 +1959,7 @@ func TestFullConfig(t *testing.T) {
 				}
 			]
 			check_update_interval = "16507s"
-			client_addr = "e15dFavQ"
+			client_addr = "93.83.18.19"
 			data_dir = "oTOOIoV9"
 			datacenter = "rzo029wg"
 			disable_anonymous_signature = true
@@ -1959,8 +2051,8 @@ func TestFullConfig(t *testing.T) {
 					advertise = "wHQJBv9R"
 				}
 			]
-			serf_lan = "bdJGdMtR"
-			serf_wan = "rSfygrZH"
+			serf_lan = "99.43.63.15"
+			serf_wan = "67.88.33.19"
 			server = true
 			server_name = "Oerr9n1G"
 			service = {
@@ -2211,8 +2303,8 @@ func TestFullConfig(t *testing.T) {
 		ACLReplicationToken:              "LMmgy5dO",
 		ACLTTL:                           18060 * time.Second,
 		ACLToken:                         "O1El0wan",
-		AdvertiseAddrLAN:                 "zkCS5pci",
-		AdvertiseAddrWAN:                 "587rk4R8",
+		AdvertiseAddrLAN:                 tcpAddr("17.99.29.16:8300"),
+		AdvertiseAddrWAN:                 tcpAddr("78.63.37.19:8300"),
 		AutopilotCleanupDeadServers:      true,
 		AutopilotDisableUpgradeMigration: true,
 		AutopilotLastContactThreshold:    12705 * time.Second,
@@ -2220,7 +2312,7 @@ func TestFullConfig(t *testing.T) {
 		AutopilotRedundancyZoneTag:       "3IsufDJf",
 		AutopilotServerStabilizationTime: 23057 * time.Second,
 		AutopilotUpgradeVersionTag:       "W9pDwFAL",
-		BindAddrs:                        []string{"6rFPKyh6"},
+		BindAddr:                         ipAddr("16.99.34.17"),
 		Bootstrap:                        true,
 		BootstrapExpect:                  53,
 		CAFile:                           "erA7T0PM",
@@ -2298,8 +2390,8 @@ func TestFullConfig(t *testing.T) {
 			},
 		},
 		CheckUpdateInterval:       16507 * time.Second,
-		ClientAddrs:               []string{"e15dFavQ"},
-		DNSAddrs:                  []string{"kEtdOtsn:7001"},
+		ClientAddrs:               []*net.IPAddr{ipAddr("93.83.18.19")},
+		DNSAddrs:                  []net.Addr{tcpAddr("93.95.95.81:7001")},
 		DNSAllowStale:             true,
 		DNSDisableCompression:     true,
 		DNSDomain:                 "7W1xXSqd",
@@ -2329,11 +2421,11 @@ func TestFullConfig(t *testing.T) {
 		EncryptKey:                "A4wELWqH",
 		EncryptVerifyIncoming:     true,
 		EncryptVerifyOutgoing:     true,
-		HTTPAddrs:                 []string{"uCOhLXzi:7999"},
+		HTTPAddrs:                 []net.Addr{tcpAddr("83.39.91.39:7999")},
 		HTTPBlockEndpoints:        []string{"RBvAFcGD", "fWOWFznh"},
 		HTTPPort:                  7999,
 		HTTPResponseHeaders:       map[string]string{"M6TKa9NP": "xjuxjOzQ", "JRCrHZed": "rl0mTx81"},
-		HTTPSAddrs:                []string{"z4j7tmn2:15127"},
+		HTTPSAddrs:                []net.Addr{tcpAddr("95.17.17.19:15127")},
 		HTTPSPort:                 15127,
 		KeyFile:                   "IEkkwgIA",
 		LeaveOnTerm:               true,
@@ -2344,7 +2436,7 @@ func TestFullConfig(t *testing.T) {
 		NonVotingServer:           true,
 		PerformanceRaftMultiplier: 22057,
 		PidFile:                   "43xN80Km",
-		RPCAdvertiseAddr:          "6dJYROsv",
+		RPCAdvertiseAddr:          tcpAddr("28.27.94.38:8300"),
 		RPCProtocol:               30793,
 		RPCRateLimit:              12029.43,
 		RPCMaxBurst:               44848,
@@ -2538,10 +2630,10 @@ func TestFullConfig(t *testing.T) {
 				},
 			},
 		},
-		SerfAdvertiseAddrLAN:                        "XPYfEKBY",
-		SerfAdvertiseAddrWAN:                        "53wnhkCC",
-		SerfBindAddrLAN:                             "bdJGdMtR",
-		SerfBindAddrWAN:                             "rSfygrZH",
+		SerfAdvertiseAddrLAN:                        tcpAddr("49.38.36.95:8301"),
+		SerfAdvertiseAddrWAN:                        tcpAddr("63.38.52.13:8302"),
+		SerfBindAddrLAN:                             tcpAddr("99.43.63.15:8301"),
+		SerfBindAddrWAN:                             tcpAddr("67.88.33.19:8302"),
 		SessionTTLMin:                               26627 * time.Second,
 		SkipLeaveOnInt:                              true,
 		StartJoinAddrsLAN:                           []string{"LR3hGDoG", "MwVpZ4Up"},

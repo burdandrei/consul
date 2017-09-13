@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net"
 	"time"
 
 	"github.com/hashicorp/consul/agent/structs"
@@ -80,9 +81,9 @@ type RuntimeConfig struct {
 	TelemetryStatsiteAddr                       string
 	TelemetryStatsitePrefix                     string
 
-	AdvertiseAddrLAN            string
-	AdvertiseAddrWAN            string
-	BindAddrs                   []string
+	AdvertiseAddrLAN            *net.TCPAddr
+	AdvertiseAddrWAN            *net.TCPAddr
+	BindAddr                    *net.IPAddr
 	Bootstrap                   bool
 	BootstrapExpect             int
 	CAFile                      string
@@ -90,8 +91,8 @@ type RuntimeConfig struct {
 	CertFile                    string
 	CheckUpdateInterval         time.Duration
 	Checks                      []*structs.CheckDefinition
-	ClientAddrs                 []string
-	DNSAddrs                    []string
+	ClientAddrs                 []*net.IPAddr
+	DNSAddrs                    []net.Addr
 	DNSPort                     int
 	DataDir                     string
 	Datacenter                  string
@@ -110,9 +111,9 @@ type RuntimeConfig struct {
 	EncryptKey                  string
 	EncryptVerifyIncoming       bool
 	EncryptVerifyOutgoing       bool
-	HTTPAddrs                   []string
+	HTTPAddrs                   []net.Addr
 	HTTPPort                    int
-	HTTPSAddrs                  []string
+	HTTPSAddrs                  []net.Addr
 	HTTPSPort                   int
 	KeyFile                     string
 	LeaveOnTerm                 bool
@@ -122,7 +123,7 @@ type RuntimeConfig struct {
 	NodeName                    string
 	NonVotingServer             bool
 	PidFile                     string
-	RPCAdvertiseAddr            string
+	RPCAdvertiseAddr            *net.TCPAddr
 	RPCMaxBurst                 int
 	RPCProtocol                 int
 	RPCRateLimit                rate.Limit
@@ -138,10 +139,10 @@ type RuntimeConfig struct {
 	RetryJoinWAN                []string
 	SegmentName                 string
 	Segments                    []structs.NetworkSegment
-	SerfAdvertiseAddrLAN        string
-	SerfAdvertiseAddrWAN        string
-	SerfBindAddrLAN             string
-	SerfBindAddrWAN             string
+	SerfAdvertiseAddrLAN        *net.TCPAddr
+	SerfAdvertiseAddrWAN        *net.TCPAddr
+	SerfBindAddrLAN             *net.TCPAddr
+	SerfBindAddrWAN             *net.TCPAddr
 	ServerMode                  bool
 	ServerName                  string
 	Services                    []*structs.ServiceDefinition

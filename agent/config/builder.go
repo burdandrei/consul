@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/consul/agent/consul"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/ipaddr"
 	"github.com/hashicorp/consul/tlsutil"
@@ -87,6 +88,14 @@ type Builder struct {
 	// Hostname returns the hostname of the machine. If nil, os.Hostname
 	// is called.
 	Hostname func() (string, error)
+
+	// PrivateIPv4 will return the private IPv4 address found.
+	// If there are multiple private IPv4 addresses an error is returned.
+	PrivateIPv4 func() (*net.IPAddr, error)
+
+	// PublicIPv6 will return the public IPv6 address found.
+	// If there are multiple public IPv6 addresses an error is returned.
+	PublicIPv6 func() (*net.IPAddr, error)
 
 	// err contains the first error that occurred during
 	// building the runtime configuration.
@@ -273,64 +282,98 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	// addresses
 	//
 
-	addrs := func(name string, addrs []string, overrideAddr *string, port int) []string {
-		if port <= 0 {
-			return nil
-		}
+	dnsPort := b.portVal(c.Ports.DNS)
+	httpPort := b.portVal(c.Ports.HTTP)
+	httpsPort := b.portVal(c.Ports.HTTPS)
+	serverPort := b.portVal(c.Ports.Server)
+	serfPortLAN := b.portVal(c.Ports.SerfLAN)
+	serfPortWAN := b.portVal(c.Ports.SerfWAN)
 
-		if b.stringVal(overrideAddr) != "" {
-			addrs = b.ipTemplateVal(name, overrideAddr)
-		}
-
-		var a []string
-		for _, addr := range addrs {
-			switch {
-			case b.isSocket(addr):
-				a = append(a, addr)
-			default:
-				a = append(a, b.joinHostPort(addr, port))
+	// we need to treat the bindAddr special since
+	// we need to know whether the expanded value is
+	// 0.0.0.0 or [::] since in these cases the
+	// advertise addresses are chosen differently.
+	privateIPv4 := b.PrivateIPv4
+	if privateIPv4 == nil {
+		privateIPv4 = func() (*net.IPAddr, error) {
+			ip, err := consul.GetPrivateIP()
+			if err != nil {
+				return nil, err
 			}
+			return &net.IPAddr{IP: ip}, nil
 		}
-		return a
 	}
 
-	var bindAddrs []string
-	if c.BindAddr != nil {
-		bindAddrs = b.ipTemplateVal("bind", c.BindAddr)
+	publicIPv6 := b.PublicIPv6
+	if publicIPv6 == nil {
+		publicIPv6 = func() (*net.IPAddr, error) {
+			ip, err := consul.GetPublicIPv6()
+			if err != nil {
+				return nil, err
+			}
+			return &net.IPAddr{IP: ip}, nil
+		}
 	}
 
-	var clientAddrs []string
-	if c.ClientAddr != nil {
-		clientAddrs = b.ipTemplateVal("client", c.ClientAddr)
+	// first derive the advertise address from the configured
+	// or expanded bind address
+	var bindAddr *net.IPAddr
+	var derivedAdvertiseAddr string
+	switch {
+	case ipaddr.IsAnyV4(b.stringVal(c.BindAddr)):
+		bindAddr = b.expandFirstIP("bind_addr", c.BindAddr)
+		derivedAdvertiseAddr = "0.0.0.0"
+
+	case ipaddr.IsAnyV6(b.stringVal(c.BindAddr)):
+		bindAddr = b.expandFirstIP("bind_addr", c.BindAddr)
+		derivedAdvertiseAddr = "[::]"
+
+	default:
+		bindAddr = b.expandFirstIP("bind_addr", c.BindAddr)
+		if b.err != nil {
+			return RuntimeConfig{}, b.err
+		}
+		switch {
+		case ipaddr.IsAnyV4(bindAddr):
+			derivedAdvertiseAddr = "0.0.0.0"
+		case ipaddr.IsAnyV6(bindAddr):
+			derivedAdvertiseAddr = "[::]"
+		}
 	}
 
-	// todo(fs): take magic value for "disabled" into account, e.g. 0 or -1
-	dnsPort := b.intVal(c.Ports.DNS)
-	if dnsPort < 0 {
-		dnsPort = 0
-	}
-	dnsAddrs := addrs("dns", clientAddrs, c.Addresses.DNS, dnsPort)
+	// determine the actual advertise address
+	var advertiseAddr *net.IPAddr
+	switch {
+	case ipaddr.IsAnyV4(derivedAdvertiseAddr):
+		advertiseAddr, err = privateIPv4()
 
-	httpPort := b.intVal(c.Ports.HTTP)
-	if httpPort < 0 {
-		httpPort = 0
-	}
-	httpAddrs := addrs("http", clientAddrs, c.Addresses.HTTP, httpPort)
+	case ipaddr.IsAnyV6(derivedAdvertiseAddr):
+		advertiseAddr, err = publicIPv6()
 
-	httpsPort := b.intVal(c.Ports.HTTPS)
-	if httpsPort < 0 {
-		httpsPort = 0
+	default:
+		advertiseAddr = bindAddr
 	}
-	httpsAddrs := addrs("https", clientAddrs, c.Addresses.HTTPS, httpsPort)
+	if err != nil {
+		// show "bind_addr" as the root cause of the error since we
+		// cannot derive a proper advertise address from the configured
+		// bind address. Hence, the bind address configuration is the
+		// main issue.
+		return RuntimeConfig{}, fmt.Errorf("bind_addr: %s", err)
+	}
 
-	// todo(fs): add ports
-	advertiseAddrLAN := b.singleIPTemplateVal("advertise lan", c.AdvertiseAddrLAN)
-	advertiseAddrWAN := b.singleIPTemplateVal("advertise wan", c.AdvertiseAddrWAN)
-	rpcAdvertiseAddr := b.singleIPTemplateVal("rpc advertise", c.AdvertiseAddrs.RPC)
-	serfAdvertiseAddrLAN := b.singleIPTemplateVal("serf advertise lan", c.AdvertiseAddrs.SerfLAN)
-	serfAdvertiseAddrWAN := b.singleIPTemplateVal("serf advertise wan", c.AdvertiseAddrs.SerfWAN)
-	serfBindAddrLAN := b.singleIPTemplateVal("serf bind lan", c.SerfBindAddrLAN)
-	serfBindAddrWAN := b.singleIPTemplateVal("serf bind wan", c.SerfBindAddrWAN)
+	serfBindAddrLAN := b.makeTCPAddr(b.expandFirstIP("serf_lan", c.SerfBindAddrLAN), advertiseAddr, serfPortLAN)
+	serfBindAddrWAN := b.makeTCPAddr(b.expandFirstIP("serf_wan", c.SerfBindAddrWAN), advertiseAddr, serfPortWAN)
+	// serverBindAddr := b.makeTCPAddr(bindAddr, nil, serverPort)
+	advertiseAddrLAN := b.makeTCPAddr(b.expandFirstIP("advertise_addr", c.AdvertiseAddrLAN), advertiseAddr, serverPort)
+	advertiseAddrWAN := b.makeTCPAddr(b.expandFirstIP("advertise_addr_wan", c.AdvertiseAddrWAN), advertiseAddrLAN, serverPort)
+	serfAdvertiseAddrLAN := b.makeTCPAddr(b.expandFirstIP("advertise_addresses.serf_lan", c.AdvertiseAddrs.SerfLAN), advertiseAddr, serfPortLAN)
+	serfAdvertiseAddrWAN := b.makeTCPAddr(b.expandFirstIP("advertise_addresses.serf_wan", c.AdvertiseAddrs.SerfWAN), advertiseAddr, serfPortWAN)
+	serverAdvertiseAddr := b.makeTCPAddr(b.expandFirstIP("advertise_addresses.rpc", c.AdvertiseAddrs.RPC), advertiseAddr, serverPort)
+
+	clientAddrs := b.expandIPs("client_addr", c.ClientAddr)
+	dnsAddrs := b.makeAddrs(b.expandAddrs("addresses.dns", c.Addresses.DNS), clientAddrs, dnsPort)
+	httpAddrs := b.makeAddrs(b.expandAddrs("addresses.http", c.Addresses.HTTP), clientAddrs, httpPort)
+	httpsAddrs := b.makeAddrs(b.expandAddrs("addresses.https", c.Addresses.HTTPS), clientAddrs, httpsPort)
 
 	// segments
 	var segments []structs.NetworkSegment
@@ -596,7 +639,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		// Agent
 		AdvertiseAddrLAN:            advertiseAddrLAN,
 		AdvertiseAddrWAN:            advertiseAddrWAN,
-		BindAddrs:                   bindAddrs,
+		BindAddr:                    bindAddr,
 		Bootstrap:                   b.boolVal(c.Bootstrap),
 		BootstrapExpect:             b.intVal(c.BootstrapExpect),
 		CAFile:                      b.stringVal(c.CAFile),
@@ -629,7 +672,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		NodeName:                    b.nodeName(c.NodeName),
 		NonVotingServer:             b.boolVal(c.NonVotingServer),
 		PidFile:                     b.stringVal(c.PidFile),
-		RPCAdvertiseAddr:            rpcAdvertiseAddr,
+		RPCAdvertiseAddr:            serverAdvertiseAddr,
 		RPCProtocol:                 b.intVal(c.RPCProtocol),
 		RPCRateLimit:                rate.Limit(b.float64Val(c.Limits.RPCRate)),
 		RPCMaxBurst:                 b.intVal(c.Limits.RPCMaxBurst),
@@ -743,11 +786,23 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 	}
 
 	if ipaddr.IsAny(rt.AdvertiseAddrLAN) {
-		return fmt.Errorf("Advertise address cannot be %s", rt.AdvertiseAddrLAN)
+		return fmt.Errorf("Advertise address cannot be 0.0.0.0, :: or [::]")
 	}
 
 	if ipaddr.IsAny(rt.AdvertiseAddrWAN) {
-		return fmt.Errorf("Advertise WAN address cannot be %s", rt.AdvertiseAddrWAN)
+		return fmt.Errorf("Advertise WAN address cannot be 0.0.0.0, :: or [::]")
+	}
+
+	if ipaddr.IsAny(rt.RPCAdvertiseAddr) {
+		return fmt.Errorf("RPC Advertise address cannot be 0.0.0.0, :: or [::]")
+	}
+
+	if ipaddr.IsAny(rt.SerfAdvertiseAddrLAN) {
+		return fmt.Errorf("Serf Advertise LAN address cannot be 0.0.0.0, :: or [::]")
+	}
+
+	if ipaddr.IsAny(rt.SerfAdvertiseAddrWAN) {
+		return fmt.Errorf("Serf Advertise WAN address cannot be 0.0.0.0, :: or [::]")
 	}
 
 	if rt.DNSUDPAnswerLimit <= 0 {
@@ -765,14 +820,15 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 	// make sure listener addresses are unique
 	// todo(fs): check serf and rpc advertise/bind addresses for uniqueness as well
 	usage := map[string]string{}
-	uniqueAddr := func(name, addr string) error {
-		if other, inuse := usage[addr]; inuse {
-			return fmt.Errorf("%s address %s already configured for %s", name, addr, other)
+	uniqueAddr := func(name string, addr net.Addr) error {
+		key := addr.String()
+		if other, inuse := usage[key]; inuse {
+			return fmt.Errorf("%s address %s already configured for %s", name, key, other)
 		}
-		usage[addr] = name
+		usage[key] = name
 		return nil
 	}
-	uniqueAddrs := func(name string, addrs []string) error {
+	uniqueAddrs := func(name string, addrs []net.Addr) error {
 		for _, a := range addrs {
 			if err := uniqueAddr(name, a); err != nil {
 				return err
@@ -790,15 +846,15 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 	if err := uniqueAddrs("HTTPS", rt.HTTPSAddrs); err != nil {
 		return err
 	}
-	// if err := uniqueAddr("RPC Advertise", b.joinHostPo(rt.RPCAdvertiseAddr, rt.Ports.Server); err != nil {
-	// 	return err
-	// }
-	// if err := uniqueAddr("Serf Advertise LAN", rt.SerfAdvertiseAddrLAN); err != nil {
-	// 	return err
-	// }
-	// if err := uniqueAddr("Serf Advertise WAN", rt.SerfAdvertiseAddrWAN); err != nil {
-	// 	return err
-	// }
+	if err := uniqueAddr("RPC Advertise", rt.RPCAdvertiseAddr); err != nil {
+		return err
+	}
+	if err := uniqueAddr("Serf Advertise LAN", rt.SerfAdvertiseAddrLAN); err != nil {
+		return err
+	}
+	if err := uniqueAddr("Serf Advertise WAN", rt.SerfAdvertiseAddrWAN); err != nil {
+		return err
+	}
 
 	if rt.ServerMode && rt.SegmentName != "" {
 		return fmt.Errorf("Segment option can only be set on clients")
@@ -935,6 +991,13 @@ func (b *Builder) intVal(v *int) int {
 	return *v
 }
 
+func (b *Builder) portVal(v *int) int {
+	if b.err != nil || v == nil || *v <= 0 || *v > 65535 {
+		return -1
+	}
+	return *v
+}
+
 func (b *Builder) int64Val(v *int64) int64 {
 	if b.err != nil || v == nil {
 		return 0
@@ -1037,4 +1100,179 @@ func (b *Builder) nodeName(v *string) string {
 		nodeName = name
 	}
 	return strings.TrimSpace(nodeName)
+}
+
+// expandAddrs expands the go-sockaddr template in s and returns the
+// result as a list of *net.IPAddr and *net.UnixAddr.
+func (b *Builder) expandAddrs(name string, s *string) []net.Addr {
+	if b.err != nil || s == nil {
+		return nil
+	}
+
+	x, err := template.Parse(*s)
+	if err != nil {
+		b.err = fmt.Errorf("%s: error parsing %q: %s", name, s, err)
+		return nil
+	}
+
+	var addrs []net.Addr
+	for _, a := range strings.Fields(x) {
+		switch {
+		case strings.HasPrefix(a, "unix://"):
+			addrs = append(addrs, &net.UnixAddr{Name: a[len("unix://"):], Net: "unix"})
+		default:
+			// net.ParseIP does not like '[::]'
+			ip := net.ParseIP(a)
+			if a == "[::]" {
+				ip = net.ParseIP("::")
+			}
+			if ip == nil {
+				b.err = fmt.Errorf("%s: invalid ip address: %s", name, a)
+				return nil
+			}
+			addrs = append(addrs, &net.IPAddr{IP: ip})
+		}
+	}
+
+	return addrs
+}
+
+// expandIPs expands the go-sockaddr template in s and returns a list of
+// *net.IPAddr. If one of the expanded addresses is a unix socket
+// address an error is set and nil is returned.
+func (b *Builder) expandIPs(name string, s *string) []*net.IPAddr {
+	if b.err != nil || s == nil {
+		return nil
+	}
+
+	addrs := b.expandAddrs(name, s)
+	var x []*net.IPAddr
+	for _, addr := range addrs {
+		switch a := addr.(type) {
+		case *net.IPAddr:
+			x = append(x, a)
+		case *net.UnixAddr:
+			b.err = fmt.Errorf("%s: cannot use a unix socket: %s", name, a)
+			return nil
+		default:
+			b.err = fmt.Errorf("%s: invalid address type %T", a)
+			return nil
+		}
+	}
+	return x
+}
+
+// expandFirstAddr expands the go-sockaddr template in s and returns the
+// first address which is either a *net.IPAddr or a *net.UnixAddr. If
+// the template expands to multiple addresses and error is set and nil
+// is returned.
+func (b *Builder) expandFirstAddr(name string, s *string) net.Addr {
+	if b.err != nil || s == nil {
+		return nil
+	}
+
+	addrs := b.expandAddrs(name, s)
+	if len(addrs) == 0 {
+		return nil
+	}
+	if len(addrs) > 1 {
+		var x []string
+		for _, a := range addrs {
+			x = append(x, a.String())
+		}
+		b.err = fmt.Errorf("%s: multiple addresses found: %s", name, strings.Join(x, " "))
+		return nil
+	}
+	return addrs[0]
+}
+
+// expandFirstIP exapnds the go-sockaddr template in s and returns the
+// first address if it is not a unix socket address. If the template
+// expands to multiple addresses and error is set and nil is returned.
+func (b *Builder) expandFirstIP(name string, s *string) *net.IPAddr {
+	if b.err != nil || s == nil {
+		return nil
+	}
+
+	addr := b.expandFirstAddr(name, s)
+	if addr == nil {
+		return nil
+	}
+	switch a := addr.(type) {
+	case *net.IPAddr:
+		return a
+	case *net.UnixAddr:
+		b.err = fmt.Errorf("%s: cannot use a unix socket: %s", name, addr)
+		return nil
+	default:
+		b.err = fmt.Errorf("%s: invalid address type %T", a)
+		return nil
+	}
+}
+
+func (b *Builder) makeTCPAddr(pri *net.IPAddr, sec net.Addr, port int) *net.TCPAddr {
+	if pri == nil && sec == nil || port <= 0 {
+		return nil
+	}
+	addr := pri
+	if addr == nil {
+		switch a := sec.(type) {
+		case *net.IPAddr:
+			addr = a
+		case *net.TCPAddr:
+			addr = &net.IPAddr{IP: a.IP}
+		default:
+			panic(fmt.Sprintf("makeTCPAddr requires a net.IPAddr or a net.TCPAddr. Got %T", a))
+		}
+	}
+	return &net.TCPAddr{IP: addr.IP, Port: port}
+}
+
+// makeAddr creates an *net.TCPAddr or a *net.UnixAddr from either the
+// primary or secondary address and the given port. If the port is <= 0
+// then the address is considered to be disabled and nil is returned.
+func (b *Builder) makeAddr(pri, sec net.Addr, port int) net.Addr {
+	if pri == nil && sec == nil || port <= 0 {
+		return nil
+	}
+	addr := pri
+	if addr == nil {
+		addr = sec
+	}
+	switch a := addr.(type) {
+	case *net.IPAddr:
+		return &net.TCPAddr{IP: a.IP, Port: port}
+	case *net.UnixAddr:
+		return a
+	default:
+		panic(fmt.Sprintf("invalid address type %T", a))
+	}
+}
+
+// makeAddrs creates a list of *net.TCPAddr or *net.UnixAddr entries
+// from either the primary or secondary addresses and the given port.
+// If the port is <= 0 then the address is considered to be disabled
+// and nil is returned.
+func (b *Builder) makeAddrs(pri []net.Addr, sec []*net.IPAddr, port int) []net.Addr {
+	if len(pri) == 0 && len(sec) == 0 || port <= 0 {
+		return nil
+	}
+	addrs := pri
+	if len(addrs) == 0 {
+		addrs = []net.Addr{}
+		for _, a := range sec {
+			addrs = append(addrs, a)
+		}
+	}
+	var x []net.Addr
+	for _, a := range addrs {
+		x = append(x, b.makeAddr(a, nil, port))
+	}
+	return x
+}
+
+// isUnixAddr returns true when the given address is a unix socket address type.
+func (b *Builder) isUnixAddr(a net.Addr) bool {
+	_, ok := a.(*net.UnixAddr)
+	return a != nil && ok
 }
