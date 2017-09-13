@@ -22,14 +22,7 @@ import (
 )
 
 // todo(fs): port SetupTaggedAndAdvertiseAddrs
-// todo(fs): port existing validation from command/agent.go
 // todo(fs): support dev config
-// todo(fs): validate node_meta data
-// todo(fs): add new limit and segments
-// todo(fs): add tests for errors
-// todo(fs): check ip addrs are valid
-// todo(fs): check sockets not allowed for advertise and serf bind addrs
-// todo(fs): port VerifyUniqueListeners
 
 // Builder constructs a valid runtime configuration from multiple
 // configuration fragments.
@@ -178,6 +171,26 @@ func (b *Builder) BuildAndValidate() (RuntimeConfig, error) {
 	return rt, nil
 }
 
+// singlePrivateIPv4 returns a single private IPv4 address if one is
+// available. If multiple addresses are available an error is returned.
+func singlePrivateIPv4() (*net.IPAddr, error) {
+	ip, err := consul.GetPrivateIP()
+	if err != nil {
+		return nil, err
+	}
+	return &net.IPAddr{IP: ip}, nil
+}
+
+// singlePublicIPv6 returns a single public IPv6 address if one is
+// available. If multiple addresses are available an error is returned.
+func singlePublicIPv6() (*net.IPAddr, error) {
+	ip, err := consul.GetPublicIPv6()
+	if err != nil {
+		return nil, err
+	}
+	return &net.IPAddr{IP: ip}, nil
+}
+
 // Build constructs the runtime configuration from the config fragments
 // and the command line flags. The config fragments are processed in the
 // order they were added with the flags being processed last to give
@@ -282,6 +295,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	// addresses
 	//
 
+	// determine port values and replace values <= 0 and > 65535 with -1
 	dnsPort := b.portVal(c.Ports.DNS)
 	httpPort := b.portVal(c.Ports.HTTP)
 	httpsPort := b.portVal(c.Ports.HTTPS)
@@ -289,44 +303,34 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	serfPortLAN := b.portVal(c.Ports.SerfLAN)
 	serfPortWAN := b.portVal(c.Ports.SerfWAN)
 
-	// we need to treat the bindAddr special since
-	// we need to know whether the expanded value is
-	// 0.0.0.0 or [::] since in these cases the
-	// advertise addresses are chosen differently.
+	// determine the default bind and advertise address
+	//
+	// First check whether the user provided an ANY address or whether
+	// the expanded template results in an ANY address. In that case we
+	// derive an advertise address from the current network
+	// configuration since we can listen on an ANY address for incoming
+	// traffic but cannot advertise it as the address on which the
+	// server can be reached.
 	privateIPv4 := b.PrivateIPv4
 	if privateIPv4 == nil {
-		privateIPv4 = func() (*net.IPAddr, error) {
-			ip, err := consul.GetPrivateIP()
-			if err != nil {
-				return nil, err
-			}
-			return &net.IPAddr{IP: ip}, nil
-		}
+		privateIPv4 = singlePrivateIPv4
 	}
 
 	publicIPv6 := b.PublicIPv6
 	if publicIPv6 == nil {
-		publicIPv6 = func() (*net.IPAddr, error) {
-			ip, err := consul.GetPublicIPv6()
-			if err != nil {
-				return nil, err
-			}
-			return &net.IPAddr{IP: ip}, nil
-		}
+		publicIPv6 = singlePublicIPv6
 	}
 
-	// first derive the advertise address from the configured
-	// or expanded bind address
 	var bindAddr *net.IPAddr
-	var derivedAdvertiseAddr string
+	var anyAddr string
 	switch {
 	case ipaddr.IsAnyV4(b.stringVal(c.BindAddr)):
 		bindAddr = b.expandFirstIP("bind_addr", c.BindAddr)
-		derivedAdvertiseAddr = "0.0.0.0"
+		anyAddr = "0.0.0.0"
 
 	case ipaddr.IsAnyV6(b.stringVal(c.BindAddr)):
 		bindAddr = b.expandFirstIP("bind_addr", c.BindAddr)
-		derivedAdvertiseAddr = "[::]"
+		anyAddr = "::"
 
 	default:
 		bindAddr = b.expandFirstIP("bind_addr", c.BindAddr)
@@ -335,21 +339,18 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		}
 		switch {
 		case ipaddr.IsAnyV4(bindAddr):
-			derivedAdvertiseAddr = "0.0.0.0"
+			anyAddr = "0.0.0.0"
 		case ipaddr.IsAnyV6(bindAddr):
-			derivedAdvertiseAddr = "[::]"
+			anyAddr = "::"
 		}
 	}
 
-	// determine the actual advertise address
 	var advertiseAddr *net.IPAddr
-	switch {
-	case ipaddr.IsAnyV4(derivedAdvertiseAddr):
+	switch anyAddr {
+	case "0.0.0.0":
 		advertiseAddr, err = privateIPv4()
-
-	case ipaddr.IsAnyV6(derivedAdvertiseAddr):
+	case "::":
 		advertiseAddr, err = publicIPv6()
-
 	default:
 		advertiseAddr = bindAddr
 	}
@@ -361,15 +362,19 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		return RuntimeConfig{}, fmt.Errorf("bind_addr: %s", err)
 	}
 
-	serfBindAddrLAN := b.makeTCPAddr(b.expandFirstIP("serf_lan", c.SerfBindAddrLAN), advertiseAddr, serfPortLAN)
-	serfBindAddrWAN := b.makeTCPAddr(b.expandFirstIP("serf_wan", c.SerfBindAddrWAN), advertiseAddr, serfPortWAN)
+	// derive other bind addresses from the bindAddr
+	serfBindAddrLAN := b.makeTCPAddr(b.expandFirstIP("serf_lan", c.SerfBindAddrLAN), bindAddr, serfPortLAN)
+	serfBindAddrWAN := b.makeTCPAddr(b.expandFirstIP("serf_wan", c.SerfBindAddrWAN), bindAddr, serfPortWAN)
 	// serverBindAddr := b.makeTCPAddr(bindAddr, nil, serverPort)
+
+	// derive other advertise addresses from the advertise address
 	advertiseAddrLAN := b.makeTCPAddr(b.expandFirstIP("advertise_addr", c.AdvertiseAddrLAN), advertiseAddr, serverPort)
 	advertiseAddrWAN := b.makeTCPAddr(b.expandFirstIP("advertise_addr_wan", c.AdvertiseAddrWAN), advertiseAddrLAN, serverPort)
 	serfAdvertiseAddrLAN := b.makeTCPAddr(b.expandFirstIP("advertise_addresses.serf_lan", c.AdvertiseAddrs.SerfLAN), advertiseAddr, serfPortLAN)
 	serfAdvertiseAddrWAN := b.makeTCPAddr(b.expandFirstIP("advertise_addresses.serf_wan", c.AdvertiseAddrs.SerfWAN), advertiseAddr, serfPortWAN)
 	serverAdvertiseAddr := b.makeTCPAddr(b.expandFirstIP("advertise_addresses.rpc", c.AdvertiseAddrs.RPC), advertiseAddr, serverPort)
 
+	// determine client addresses
 	clientAddrs := b.expandIPs("client_addr", c.ClientAddr)
 	dnsAddrs := b.makeAddrs(b.expandAddrs("addresses.dns", c.Addresses.DNS), clientAddrs, dnsPort)
 	httpAddrs := b.makeAddrs(b.expandAddrs("addresses.http", c.Addresses.HTTP), clientAddrs, httpPort)
@@ -378,12 +383,25 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	// segments
 	var segments []structs.NetworkSegment
 	for _, s := range c.Segments {
+		name := b.stringVal(s.Name)
+
+		var bind string
+		if a := b.expandFirstIP(fmt.Sprintf("segments[%s].bind", name), s.Bind); a != nil {
+			bind = a.IP.String()
+		}
+
+		var advertise string
+		if a := b.expandFirstIP(fmt.Sprintf("segments[%s].advertise", name), s.Advertise); a != nil {
+			advertise = a.IP.String()
+		}
+
+		// todo(fs): segments should use *net.IPAddr for Bind and Advertise
 		segments = append(segments, structs.NetworkSegment{
-			Name:        b.stringVal(s.Name),
-			Bind:        b.stringVal(s.Bind),
+			Name:        name,
+			Bind:        bind,
+			Advertise:   advertise,
 			Port:        b.intVal(s.Port),
 			RPCListener: b.boolVal(s.RPCListener),
-			Advertise:   b.stringVal(s.Advertise),
 		})
 	}
 
@@ -803,6 +821,12 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 
 	if ipaddr.IsAny(rt.SerfAdvertiseAddrWAN) {
 		return fmt.Errorf("Serf Advertise WAN address cannot be 0.0.0.0, :: or [::]")
+	}
+
+	for _, s := range rt.Segments {
+		if ipaddr.IsAny(s.Advertise) {
+			return fmt.Errorf("segments[%s].advertise cannot be 0.0.0.0, :: or [::]", s.Name)
+		}
 	}
 
 	if rt.DNSUDPAnswerLimit <= 0 {

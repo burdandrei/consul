@@ -1067,6 +1067,13 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			err:   errors.New("autopilot.max_trailing_logs < 0"),
 		},
 		{
+			desc:  "bind does not allow socket",
+			flags: []string{`-datacenter=a`},
+			json:  []string{`{ "bind_addr": "unix:///foo" }`},
+			hcl:   []string{`bind_addr = "unix:///foo"`},
+			err:   errors.New("bind_addr: cannot use a unix socket: /foo"),
+		},
+		{
 			desc:  "bootstrap without server",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "bootstrap": true }`},
@@ -1102,6 +1109,13 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			err:   errors.New("BootstrapExpect mode and Bootstrap mode are mutually exclusive"),
 		},
 		{
+			desc:  "client does not allow socket",
+			flags: []string{`-datacenter=a`},
+			json:  []string{`{ "client_addr": "unix:///foo" }`},
+			hcl:   []string{`client_addr = "unix:///foo"`},
+			err:   errors.New("client_addr: cannot use a unix socket: /foo"),
+		},
+		{
 			desc:  "enable_ui and ui_dir",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "enable_ui": true, "ui_dir": "a" }`},
@@ -1110,61 +1124,22 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				"If trying to use your own web UI resources, use the ui-dir flag.\n" +
 				"If using Consul version 0.7.0 or later, the web UI is included in the binary so use ui to enable it"),
 		},
+
+		// test ANY address failures
+		// to avoid combinatory explosion for tests use 0.0.0.0, :: or [::] but not all of them
 		{
-			desc:  "advertise_addr ipv4 any",
+			desc:  "advertise_addr any",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr": "0.0.0.0" }`},
 			hcl:   []string{`advertise_addr = "0.0.0.0"`},
 			err:   errors.New("Advertise address cannot be 0.0.0.0, :: or [::]"),
 		},
 		{
-			desc:  "advertise_addr ipv6 any",
-			flags: []string{`-datacenter=a`},
-			json:  []string{`{ "advertise_addr": "::" }`},
-			hcl:   []string{`advertise_addr = "::"`},
-			err:   errors.New("Advertise address cannot be 0.0.0.0, :: or [::]"),
-		},
-		{
-			desc:  "advertise_addr ipv6 any brackets",
-			flags: []string{`-datacenter=a`},
-			json:  []string{`{ "advertise_addr": "[::]" }`},
-			hcl:   []string{`advertise_addr = "[::]"`},
-			err:   errors.New("Advertise address cannot be 0.0.0.0, :: or [::]"),
-		},
-		{
-			desc:  "advertise_addr_wan ipv4 any",
-			flags: []string{`-datacenter=a`},
-			json:  []string{`{ "advertise_addr_wan": "0.0.0.0" }`},
-			hcl:   []string{`advertise_addr_wan = "0.0.0.0"`},
-			err:   errors.New("Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
-		},
-		{
-			desc:  "advertise_addr_wan ipv6 any",
+			desc:  "advertise_addr_wan any",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addr_wan": "::" }`},
 			hcl:   []string{`advertise_addr_wan = "::"`},
 			err:   errors.New("Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
-		},
-		{
-			desc:  "advertise_addr_wan ipv6 any brackets",
-			flags: []string{`-datacenter=a`},
-			json:  []string{`{ "advertise_addr_wan": "[::]" }`},
-			hcl:   []string{`advertise_addr_wan = "[::]"`},
-			err:   errors.New("Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
-		},
-		{
-			desc:  "advertise_addrs.serf_lan ipv4 any",
-			flags: []string{`-datacenter=a`},
-			json:  []string{`{ "advertise_addrs":{ "serf_lan": "0.0.0.0" } }`},
-			hcl:   []string{`advertise_addrs = { serf_lan = "0.0.0.0" }`},
-			err:   errors.New("Serf Advertise LAN address cannot be 0.0.0.0, :: or [::]"),
-		},
-		{
-			desc:  "advertise_addrs.serf_lan ipv4 any",
-			flags: []string{`-datacenter=a`},
-			json:  []string{`{ "advertise_addrs":{ "serf_lan": "::" } }`},
-			hcl:   []string{`advertise_addrs = { serf_lan = "::" }`},
-			err:   errors.New("Serf Advertise LAN address cannot be 0.0.0.0, :: or [::]"),
 		},
 		{
 			desc:  "advertise_addrs.serf_lan ipv4 any",
@@ -1180,21 +1155,22 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			hcl:   []string{`advertise_addrs = { serf_wan = "0.0.0.0" }`},
 			err:   errors.New("Serf Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
 		},
-		{
-			desc:  "advertise_addrs.serf_wan ipv4 any",
-			flags: []string{`-datacenter=a`},
-			json:  []string{`{ "advertise_addrs":{ "serf_wan": "::" } }`},
-			hcl:   []string{`advertise_addrs = { serf_wan = "::" }`},
-			err:   errors.New("Serf Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
-		},
-		{
-			desc:  "advertise_addrs.serf_wan ipv4 any",
-			flags: []string{`-datacenter=a`},
-			json:  []string{`{ "advertise_addrs":{ "serf_wan": "[::]" } }`},
-			hcl:   []string{`advertise_addrs = { serf_wan = "[::]" }`},
-			err:   errors.New("Serf Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
-		},
 		//todo(fs): rpc advertise any addr
+		//todo(fs): segment advertise no socket
+		{
+			desc:  "segment.advertise any",
+			flags: []string{`-datacenter=a`},
+			json:  []string{`{ "segments":[{ "name":"x", "advertise": "::" }] }`},
+			hcl:   []string{`segments = [{ name = "x" advertise = "::" }]`},
+			err:   errors.New(`segments[x].advertise cannot be 0.0.0.0, :: or [::]`),
+		},
+		{
+			desc:  "segment.advertise socket",
+			flags: []string{`-datacenter=a`},
+			json:  []string{`{ "segments":[{ "name":"x", "advertise": "unix:///foo" }] }`},
+			hcl:   []string{`segments = [{ name = "x" advertise = "unix:///foo" }]`},
+			err:   errors.New(`segments[x].advertise: cannot use a unix socket: /foo`),
+		},
 		{
 			desc:  "dns_config.udp_answer_limit invalid",
 			flags: []string{`-datacenter=a`},
@@ -1616,17 +1592,17 @@ func TestFullConfig(t *testing.T) {
 			"segments": [
 				{
 					"name": "PExYMe2E",
-					"bind": "glvbzk9Z",
+					"bind": "36.73.36.19",
 					"port": 38295,
 					"rpc_listener": true,
-					"advertise": "A72483Io"
+					"advertise": "63.39.19.18"
 				},
 				{
 					"name": "UzCvJgup",
-					"bind": "ZEhIEdtJ",
+					"bind": "37.58.38.19",
 					"port": 39292,
 					"rpc_listener": true,
-					"advertise": "wHQJBv9R"
+					"advertise": "83.58.26.27"
 				}
 			],
 			"serf_lan": "99.43.63.15",
@@ -2038,17 +2014,17 @@ func TestFullConfig(t *testing.T) {
 			segments = [
 				{
 					name = "PExYMe2E"
-					bind = "glvbzk9Z"
+					bind = "36.73.36.19"
 					port = 38295
 					rpc_listener = true
-					advertise = "A72483Io"
+					advertise = "63.39.19.18"
 				},
 				{
 					name = "UzCvJgup"
-					bind = "ZEhIEdtJ"
+					bind = "37.58.38.19"
 					port = 39292
 					rpc_listener = true
-					advertise = "wHQJBv9R"
+					advertise = "83.58.26.27"
 				}
 			]
 			serf_lan = "99.43.63.15"
@@ -2454,17 +2430,17 @@ func TestFullConfig(t *testing.T) {
 		Segments: []structs.NetworkSegment{
 			{
 				Name:        "PExYMe2E",
-				Bind:        "glvbzk9Z",
+				Bind:        "36.73.36.19",
 				Port:        38295,
 				RPCListener: true,
-				Advertise:   "A72483Io",
+				Advertise:   "63.39.19.18",
 			},
 			{
 				Name:        "UzCvJgup",
-				Bind:        "ZEhIEdtJ",
+				Bind:        "37.58.38.19",
 				Port:        39292,
 				RPCListener: true,
-				Advertise:   "wHQJBv9R",
+				Advertise:   "83.58.26.27",
 			},
 		},
 		ServerMode: true,
