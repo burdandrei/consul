@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +22,26 @@ import (
 
 // todo(fs): port SetupTaggedAndAdvertiseAddrs
 // todo(fs): support dev config
+
+func NewRuntimeConfig(c ...Config) (RuntimeConfig, []string, error) {
+	b := &Builder{
+		Configs:        c,
+		DefaultRuntime: nonUserConfig,
+	}
+	rt, err := b.BuildAndValidate()
+	return rt, b.Warnings, err
+}
+
+func mustRuntimeConfig(name string, c Config) RuntimeConfig {
+	rt, warns, err := NewRuntimeConfig(c)
+	if err != nil {
+		panic(fmt.Sprintf("Error creating %s: %s", name, err))
+	}
+	if len(warns) != 0 {
+		panic(fmt.Sprintf("Warning creating %s: %s", name, strings.Join(warns, "\n")))
+	}
+	return rt
+}
 
 // Builder constructs a valid runtime configuration from multiple
 // configuration fragments.
@@ -363,16 +382,16 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	}
 
 	// derive other bind addresses from the bindAddr
+	rpcBindAddr := b.makeTCPAddr(bindAddr, nil, serverPort)
 	serfBindAddrLAN := b.makeTCPAddr(b.expandFirstIP("serf_lan", c.SerfBindAddrLAN), bindAddr, serfPortLAN)
 	serfBindAddrWAN := b.makeTCPAddr(b.expandFirstIP("serf_wan", c.SerfBindAddrWAN), bindAddr, serfPortWAN)
-	// serverBindAddr := b.makeTCPAddr(bindAddr, nil, serverPort)
 
 	// derive other advertise addresses from the advertise address
 	advertiseAddrLAN := b.makeTCPAddr(b.expandFirstIP("advertise_addr", c.AdvertiseAddrLAN), advertiseAddr, serverPort)
 	advertiseAddrWAN := b.makeTCPAddr(b.expandFirstIP("advertise_addr_wan", c.AdvertiseAddrWAN), advertiseAddrLAN, serverPort)
+	rpcAdvertiseAddr := b.makeTCPAddr(b.expandFirstIP("advertise_addresses.rpc", c.AdvertiseAddrs.RPC), advertiseAddr, serverPort)
 	serfAdvertiseAddrLAN := b.makeTCPAddr(b.expandFirstIP("advertise_addresses.serf_lan", c.AdvertiseAddrs.SerfLAN), advertiseAddr, serfPortLAN)
 	serfAdvertiseAddrWAN := b.makeTCPAddr(b.expandFirstIP("advertise_addresses.serf_wan", c.AdvertiseAddrs.SerfWAN), advertiseAddr, serfPortWAN)
-	serverAdvertiseAddr := b.makeTCPAddr(b.expandFirstIP("advertise_addresses.rpc", c.AdvertiseAddrs.RPC), advertiseAddr, serverPort)
 
 	// determine client addresses
 	clientAddrs := b.expandIPs("client_addr", c.ClientAddr)
@@ -390,23 +409,35 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	var segments []structs.NetworkSegment
 	for _, s := range c.Segments {
 		name := b.stringVal(s.Name)
+		port := b.portVal(s.Port)
 
-		var bind string
-		if a := b.expandFirstIP(fmt.Sprintf("segments[%s].bind", name), s.Bind); a != nil {
-			bind = a.IP.String()
+		bind := b.makeTCPAddr(
+			b.expandFirstIP(fmt.Sprintf("segments[%s].bind", name), s.Bind),
+			bindAddr,
+			port,
+		)
+
+		advertise := b.makeTCPAddr(
+			b.expandFirstIP(fmt.Sprintf("segments[%s].advertise", name), s.Advertise),
+			advertiseAddrLAN,
+			port,
+		)
+
+		if b.err != nil {
+			continue
 		}
 
-		var advertise string
-		if a := b.expandFirstIP(fmt.Sprintf("segments[%s].advertise", name), s.Advertise); a != nil {
-			advertise = a.IP.String()
+		// check the port after the addresses since bind/advertise might contain
+		// a unix socket which we want to report first.
+		if port <= 0 {
+			b.err = fmt.Errorf("segment[%s].port must be > 0", name)
+			continue
 		}
 
-		// todo(fs): segments should use *net.IPAddr for Bind and Advertise
 		segments = append(segments, structs.NetworkSegment{
 			Name:        name,
 			Bind:        bind,
 			Advertise:   advertise,
-			Port:        b.intVal(s.Port),
 			RPCListener: b.boolVal(s.RPCListener),
 		})
 	}
@@ -568,27 +599,6 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		b.warn(`==> DEPRECATION: "retry_join_gce" is deprecated. Please add %q to "retry_join".`, m)
 	}
 
-	// Compile all the watches
-	// var watchPlans []*watch.Plan
-	// for _, params := range c.Watches {
-	// 	// Parse the watches, excluding the handler
-	// 	wp, err := watch.ParseExempt(params, []string{"handler"})
-	// 	if err != nil {
-	// 		b.err = fmt.Errorf("Failed to parse watch (%#v): %v", params, err)
-	// 		panic(b.err)
-	// 	}
-
-	// 	// Get the handler
-	// 	h := wp.Exempt["handler"]
-	// 	if _, ok := h.(string); h == nil || !ok {
-	// 		b.err = fmt.Errorf("Watch handler must be a string")
-	// 		panic(b.err)
-	// 	}
-
-	// 	// Store the watch plan
-	// 	watchPlans = append(watchPlans, wp)
-	// }
-
 	// ----------------------------------------------------------------
 	// build runtime config
 	//
@@ -713,10 +723,11 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		NodeName:                    b.nodeName(c.NodeName),
 		NonVotingServer:             b.boolVal(c.NonVotingServer),
 		PidFile:                     b.stringVal(c.PidFile),
-		RPCAdvertiseAddr:            serverAdvertiseAddr,
+		RPCAdvertiseAddr:            rpcAdvertiseAddr,
+		RPCBindAddr:                 rpcBindAddr,
+		RPCMaxBurst:                 b.intVal(c.Limits.RPCMaxBurst),
 		RPCProtocol:                 b.intVal(c.RPCProtocol),
 		RPCRateLimit:                rate.Limit(b.float64Val(c.Limits.RPCRate)),
-		RPCMaxBurst:                 b.intVal(c.Limits.RPCMaxBurst),
 		RaftProtocol:                b.intVal(c.RaftProtocol),
 		ReconnectTimeoutLAN:         b.durationVal(c.ReconnectTimeoutLAN),
 		ReconnectTimeoutWAN:         b.durationVal(c.ReconnectTimeoutWAN),
@@ -1077,47 +1088,6 @@ func (b *Builder) float64Val(v *float64) float64 {
 	return *v
 }
 
-func (b *Builder) singleIPTemplateVal(name string, v *string) string {
-	s := b.ipTemplateVal(name, v)
-	if b.err != nil || len(s) == 0 {
-		return ""
-	}
-	if len(s) != 1 {
-		b.err = fmt.Errorf("%s: multiple addresses configured: %v", name, s)
-		return ""
-	}
-	return s[0]
-}
-
-func (b *Builder) ipTemplateVal(name string, v *string) []string {
-	if b.err != nil || v == nil {
-		return nil
-	}
-
-	s := b.stringVal(v)
-	if s == "" {
-		return []string{"0.0.0.0"}
-	}
-
-	out, err := template.Parse(s)
-	if err != nil {
-		b.err = fmt.Errorf("%s: unable to parse address template %q: %v", name, s, err)
-		return nil
-	}
-	return strings.Fields(out)
-}
-
-func (b *Builder) joinHostPort(host string, port int) string {
-	if host == "0.0.0.0" {
-		host = ""
-	}
-	return net.JoinHostPort(host, strconv.Itoa(port))
-}
-
-func (b *Builder) isSocket(s string) bool {
-	return strings.HasPrefix(s, "unix://")
-}
-
 func (b *Builder) tlsCipherSuites(v *string) []uint16 {
 	if b.err != nil || v == nil {
 		return nil
@@ -1155,7 +1125,7 @@ func (b *Builder) nodeName(v *string) string {
 // expandAddrs expands the go-sockaddr template in s and returns the
 // result as a list of *net.IPAddr and *net.UnixAddr.
 func (b *Builder) expandAddrs(name string, s *string) []net.Addr {
-	if b.err != nil || s == nil {
+	if b.err != nil || s == nil || *s == "" {
 		return nil
 	}
 
@@ -1191,7 +1161,7 @@ func (b *Builder) expandAddrs(name string, s *string) []net.Addr {
 // *net.IPAddr. If one of the expanded addresses is a unix socket
 // address an error is set and nil is returned.
 func (b *Builder) expandIPs(name string, s *string) []*net.IPAddr {
-	if b.err != nil || s == nil {
+	if b.err != nil || s == nil || *s == "" {
 		return nil
 	}
 
@@ -1217,7 +1187,7 @@ func (b *Builder) expandIPs(name string, s *string) []*net.IPAddr {
 // the template expands to multiple addresses and error is set and nil
 // is returned.
 func (b *Builder) expandFirstAddr(name string, s *string) net.Addr {
-	if b.err != nil || s == nil {
+	if b.err != nil || s == nil || *s == "" {
 		return nil
 	}
 
@@ -1240,7 +1210,7 @@ func (b *Builder) expandFirstAddr(name string, s *string) net.Addr {
 // first address if it is not a unix socket address. If the template
 // expands to multiple addresses and error is set and nil is returned.
 func (b *Builder) expandFirstIP(name string, s *string) *net.IPAddr {
-	if b.err != nil || s == nil {
+	if b.err != nil || s == nil || *s == "" {
 		return nil
 	}
 

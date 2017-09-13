@@ -31,7 +31,7 @@ func NewHTTPServer(addr string, a *Agent) *HTTPServer {
 	s := &HTTPServer{
 		Server:    &http.Server{Addr: addr},
 		agent:     a,
-		blacklist: NewBlacklist(a.config.HTTPConfig.BlockEndpoints),
+		blacklist: NewBlacklist(a.config.HTTPBlockEndpoints),
 	}
 	s.Server.Handler = s.handler(a.config.EnableDebug)
 	return s
@@ -200,8 +200,8 @@ var (
 // wrap is used to wrap functions to make them more convenient
 func (s *HTTPServer) wrap(handler func(resp http.ResponseWriter, req *http.Request) (interface{}, error)) http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
-		setHeaders(resp, s.agent.config.HTTPConfig.ResponseHeaders)
-		setTranslateAddr(resp, s.agent.config.TranslateWanAddrs)
+		setHeaders(resp, s.agent.config.HTTPResponseHeaders)
+		setTranslateAddr(resp, s.agent.config.TranslateWANAddrs)
 
 		// Obfuscate any tokens from appearing in the logs
 		formVals, err := url.ParseQuery(req.URL.RawQuery)

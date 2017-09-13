@@ -165,14 +165,8 @@ type Agent struct {
 	endpoints     map[string]string
 	endpointsLock sync.RWMutex
 
-	// dnsAddr is the address the DNS server binds to
-	dnsAddrs []config.ProtoAddr
-
 	// dnsServer provides the DNS API
 	dnsServers []*DNSServer
-
-	// httpAddrs are the addresses per protocol the HTTP server binds to
-	httpAddrs []config.ProtoAddr
 
 	// httpServers provides the HTTP API on various endpoints
 	httpServers []*HTTPServer
@@ -197,14 +191,6 @@ func New(c *config.RuntimeConfig) (*Agent, error) {
 	if c.DataDir == "" && !c.DevMode {
 		return nil, fmt.Errorf("Must configure a DataDir")
 	}
-	dnsAddrs, err := c.GetDNSAddrs()
-	if err != nil {
-		return nil, fmt.Errorf("Invalid DNS bind address: %s", err)
-	}
-	httpAddrs, err := c.GetHTTPAddrs()
-	if err != nil {
-		return nil, fmt.Errorf("Invalid HTTP bind address: %s", err)
-	}
 	acls, err := newACLManager(c)
 	if err != nil {
 		return nil, err
@@ -226,8 +212,6 @@ func New(c *config.RuntimeConfig) (*Agent, error) {
 		retryJoinCh:     make(chan error),
 		shutdownCh:      make(chan struct{}),
 		endpoints:       make(map[string]string),
-		dnsAddrs:        dnsAddrs,
-		httpAddrs:       httpAddrs,
 		tokens:          new(token.Store),
 	}
 
@@ -323,12 +307,12 @@ func (a *Agent) Start() error {
 
 	// create listeners and unstarted servers
 	// see comment on listenHTTP why we are doing this
-	httpln, err := a.listenHTTP(a.httpAddrs)
+	httpln, err := a.listenHTTP()
 	if err != nil {
 		return err
 	}
 
-	// start HTTP servers
+	// start HTTP and HTTPS servers
 	for _, l := range httpln {
 		srv := NewHTTPServer(l.Addr().String(), a)
 		if err := a.serveHTTP(l, srv); err != nil {
@@ -350,10 +334,8 @@ func (a *Agent) Start() error {
 }
 
 func (a *Agent) listenAndServeDNS() error {
-	notif := make(chan config.ProtoAddr, len(a.dnsAddrs))
-	for _, p := range a.dnsAddrs {
-		p := p // capture loop var
-
+	notif := make(chan net.Addr, len(a.config.DNSAddrs))
+	for _, addr := range a.config.DNSAddrs {
 		// create server
 		s, err := NewDNSServer(a)
 		if err != nil {
@@ -363,22 +345,22 @@ func (a *Agent) listenAndServeDNS() error {
 
 		// start server
 		a.wgServers.Add(1)
-		go func() {
+		go func(addr net.Addr) {
 			defer a.wgServers.Done()
-
-			err := s.ListenAndServe(p.Net, p.Addr, func() { notif <- p })
+			// todo(fs): does this also work for unix sockets?
+			err := s.ListenAndServe(addr.Network(), addr.String(), func() { notif <- addr })
 			if err != nil && !strings.Contains(err.Error(), "accept") {
-				a.logger.Printf("[ERR] agent: Error starting DNS server %s (%s): %v", p.Addr, p.Net, err)
+				a.logger.Printf("[ERR] agent: Error starting DNS server %s (%s): %v", addr.String(), addr.Network(), err)
 			}
-		}()
+		}(addr)
 	}
 
 	// wait for servers to be up
 	timeout := time.After(time.Second)
-	for range a.dnsAddrs {
+	for range a.config.DNSAddrs {
 		select {
-		case p := <-notif:
-			a.logger.Printf("[INFO] agent: Started DNS server %s (%s)", p.Addr, p.Net)
+		case addr := <-notif:
+			a.logger.Printf("[INFO] agent: Started DNS server %s (%s)", addr.String(), addr.Network())
 			continue
 		case <-timeout:
 			return fmt.Errorf("agent: timeout starting DNS servers")
@@ -402,43 +384,53 @@ func (a *Agent) listenAndServeDNS() error {
 //
 // This approach should ultimately be refactored to the point where we just
 // start the server and any error should trigger a proper shutdown of the agent.
-func (a *Agent) listenHTTP(addrs []config.ProtoAddr) ([]net.Listener, error) {
+func (a *Agent) listenHTTP() ([]net.Listener, error) {
 	var ln []net.Listener
-	for _, p := range addrs {
-		var l net.Listener
-		var err error
 
-		switch {
-		case p.Net == "unix":
-			l, err = a.listenSocket(p.Addr, a.config.UnixSockets)
+	start := func(proto string, addrs []net.Addr) error {
+		for _, addr := range addrs {
+			var l net.Listener
+			var err error
 
-		case p.Net == "tcp" && p.Proto == "http":
-			l, err = net.Listen("tcp", p.Addr)
+			switch x := addr.(type) {
+			case *net.UnixAddr:
+				l, err = a.listenSocket(x.Name)
+				if err != nil {
+					return err
+				}
 
-		case p.Net == "tcp" && p.Proto == "https":
-			var tlscfg *tls.Config
-			tlscfg, err = a.config.IncomingHTTPSConfig()
-			if err != nil {
-				break
+			case *net.TCPAddr:
+				l, err = net.Listen("tcp", x.String())
+				if err != nil {
+					return err
+				}
+
+				if proto == "https" {
+					tlscfg, err := a.config.IncomingHTTPSConfig()
+					if err != nil {
+						return err
+					}
+					l = tls.NewListener(l, tlscfg)
+				}
+
+				l = &tcpKeepAliveListener{l.(*net.TCPListener)}
 			}
-			l, err = tls.Listen("tcp", p.Addr, tlscfg)
-
-		default:
-			return nil, fmt.Errorf("%s:%s listener not supported", p.Net, p.Proto)
+			ln = append(ln, l)
 		}
+		return nil
+	}
 
-		if err != nil {
-			for _, l := range ln {
-				l.Close()
-			}
-			return nil, err
+	if err := start("http", a.config.HTTPAddrs); err != nil {
+		for _, l := range ln {
+			l.Close()
 		}
-
-		if tcpl, ok := l.(*net.TCPListener); ok {
-			l = &tcpKeepAliveListener{tcpl}
+		return nil, err
+	}
+	if err := start("https", a.config.HTTPSAddrs); err != nil {
+		for _, l := range ln {
+			l.Close()
 		}
-
-		ln = append(ln, l)
+		return nil, err
 	}
 	return ln, nil
 }
@@ -460,7 +452,7 @@ func (ln tcpKeepAliveListener) Accept() (c net.Conn, err error) {
 	return tc, nil
 }
 
-func (a *Agent) listenSocket(path string, perm FilePermissions) (net.Listener, error) {
+func (a *Agent) listenSocket(path string) (net.Listener, error) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		a.logger.Printf("[WARN] agent: Replacing socket %q", path)
 	}
@@ -471,8 +463,9 @@ func (a *Agent) listenSocket(path string, perm FilePermissions) (net.Listener, e
 	if err != nil {
 		return nil, err
 	}
-	if err := setFilePermissions(path, perm); err != nil {
-		return nil, fmt.Errorf("Failed setting up HTTP socket: %s", err)
+	user, group, mode := a.config.UnixSocketUser, a.config.UnixSocketGroup, a.config.UnixSocketMode
+	if err := setFilePermissions(path, user, group, mode); err != nil {
+		return nil, fmt.Errorf("Failed setting up socket: %s", err)
 	}
 	return l, nil
 }
@@ -521,12 +514,27 @@ func (a *Agent) serveHTTP(l net.Listener, srv *HTTPServer) error {
 // set of watches.
 func (a *Agent) reloadWatches(cfg *config.RuntimeConfig) error {
 	// Watches use the API to talk to this agent, so that must be enabled.
-	addrs, err := cfg.GetHTTPAddrs()
-	if err != nil {
-		return err
-	}
-	if len(addrs) == 0 {
+	if len(cfg.HTTPAddrs) == 0 {
 		return fmt.Errorf("watch plans require an HTTP or HTTPS endpoint")
+	}
+
+	// Compile the watches
+	var watchPlans []*watch.Plan
+	for _, params := range cfg.Watches {
+		// Parse the watches, excluding the handler
+		wp, err := watch.ParseExempt(params, []string{"handler"})
+		if err != nil {
+			return fmt.Errorf("Failed to parse watch (%#v): %v", params, err)
+		}
+
+		// Get the handler
+		h := wp.Exempt["handler"]
+		if _, ok := h.(string); h == nil || !ok {
+			return fmt.Errorf("Watch handler must be a string")
+		}
+
+		// Store the watch plan
+		watchPlans = append(watchPlans, wp)
 	}
 
 	// Stop the current watches.
@@ -535,16 +543,18 @@ func (a *Agent) reloadWatches(cfg *config.RuntimeConfig) error {
 	}
 	a.watchPlans = nil
 
+	// deterine the primary http endpoint
+	addr := cfg.HTTPAddrs[0].String()
+	if cfg.HTTPAddrs[0].Network() == "unix" {
+		addr = "unix://" + addr
+	}
+
 	// Fire off a goroutine for each new watch plan.
-	for _, wp := range cfg.WatchPlans {
+	for _, wp := range watchPlans {
 		a.watchPlans = append(a.watchPlans, wp)
 		go func(wp *watch.Plan) {
 			wp.Handler = makeWatchHandler(a.LogOutput, wp.Exempt["handler"])
 			wp.LogOutput = a.LogOutput
-			addr := addrs[0].String()
-			if addrs[0].Net == "unix" {
-				addr = "unix://" + addr
-			}
 			if err := wp.Run(addr); err != nil {
 				a.logger.Printf("[ERR] Failed to run watch: %v", err)
 			}
@@ -578,78 +588,36 @@ func (a *Agent) consulConfig() (*consul.Config, error) {
 	}
 
 	// Override with our config
-	if a.config.Datacenter != "" {
-		base.Datacenter = a.config.Datacenter
-	}
-	if a.config.DataDir != "" {
-		base.DataDir = a.config.DataDir
-	}
-	if a.config.NodeName != "" {
-		base.NodeName = a.config.NodeName
-	}
-	if a.config.SerfPortLAN != 0 {
-		base.SerfLANConfig.MemberlistConfig.BindPort = a.config.SerfPortLAN
-		base.SerfLANConfig.MemberlistConfig.AdvertisePort = a.config.SerfPortLAN
-	}
-	if a.config.SerfPortWAN != 0 {
-		base.SerfWANConfig.MemberlistConfig.BindPort = a.config.SerfPortWAN
-		base.SerfWANConfig.MemberlistConfig.AdvertisePort = a.config.SerfPortWAN
-	}
-	if a.config.BindAddr != "" {
-		bindAddr := &net.TCPAddr{
-			IP:   net.ParseIP(a.config.BindAddr),
-			Port: a.config.ServerPort,
-		}
-		base.RPCAddr = bindAddr
+	// todo(fs): these are now always set in the runtime config so we can simplify this
+	// todo(fs): or is there a reason to keep it like that?
+	base.Datacenter = a.config.Datacenter
+	base.DataDir = a.config.DataDir
+	base.NodeName = a.config.NodeName
 
-		// Set the Serf configs using the old default behavior, we may
-		// override these in the code right below.
-		base.SerfLANConfig.MemberlistConfig.BindAddr = a.config.BindAddr
-		base.SerfWANConfig.MemberlistConfig.BindAddr = a.config.BindAddr
-	}
-	if a.config.SerfBindAddrLAN != "" {
-		base.SerfLANConfig.MemberlistConfig.BindAddr = a.config.SerfBindAddrLAN
-	}
-	if a.config.SerfBindAddrWAN != "" {
-		base.SerfWANConfig.MemberlistConfig.BindAddr = a.config.SerfBindAddrWAN
-	}
+	base.SerfLANConfig.MemberlistConfig.BindAddr = a.config.SerfBindAddrLAN.IP.String()
+	base.SerfLANConfig.MemberlistConfig.BindPort = a.config.SerfPortLAN
+	base.SerfLANConfig.MemberlistConfig.AdvertiseAddr = a.config.SerfAdvertiseAddrLAN.IP.String()
+	base.SerfLANConfig.MemberlistConfig.AdvertisePort = a.config.SerfPortLAN
+	base.SerfLANConfig.MemberlistConfig.GossipVerifyIncoming = a.config.EncryptVerifyIncoming
+	base.SerfLANConfig.MemberlistConfig.GossipVerifyOutgoing = a.config.EncryptVerifyOutgoing
 
-	if a.config.AdvertiseAddrLAN != "" {
-		base.SerfLANConfig.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddrLAN
-		base.SerfWANConfig.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddrLAN
-		if a.config.AdvertiseAddrWAN != "" {
-			base.SerfWANConfig.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddrWAN
-		}
-		base.RPCAdvertise = &net.TCPAddr{
-			IP:   net.ParseIP(a.config.AdvertiseAddrLAN),
-			Port: a.config.ServerPort,
-		}
-	}
-	if a.config.SerfAdvertiseAddrLAN != "" {
-		base.SerfLANConfig.MemberlistConfig.AdvertiseAddr = a.config.SerfAdvertiseAddrLAN
-		base.SerfLANConfig.MemberlistConfig.AdvertisePort = a.config.SerfPortLAN
-	}
-	if a.config.SerfAdvertiseAddrWAN != "" {
-		base.SerfWANConfig.MemberlistConfig.AdvertiseAddr = a.config.SerfAdvertiseAddrWAN
-		base.SerfWANConfig.MemberlistConfig.AdvertisePort = a.config.SerfPortWAN
-	}
+	base.SerfWANConfig.MemberlistConfig.BindAddr = a.config.SerfBindAddrWAN.IP.String()
+	base.SerfWANConfig.MemberlistConfig.BindPort = a.config.SerfPortWAN
+	base.SerfWANConfig.MemberlistConfig.AdvertiseAddr = a.config.SerfAdvertiseAddrWAN.IP.String()
+	base.SerfWANConfig.MemberlistConfig.AdvertisePort = a.config.SerfPortWAN
+	base.SerfWANConfig.MemberlistConfig.GossipVerifyIncoming = a.config.EncryptVerifyIncoming
+	base.SerfWANConfig.MemberlistConfig.GossipVerifyOutgoing = a.config.EncryptVerifyOutgoing
+
+	base.RPCAddr = a.config.RPCBindAddr
+	base.RPCAdvertise = a.config.RPCAdvertiseAddr
+
 	if a.config.ReconnectTimeoutLAN != 0 {
 		base.SerfLANConfig.ReconnectTimeout = a.config.ReconnectTimeoutLAN
 	}
 	if a.config.ReconnectTimeoutWAN != 0 {
 		base.SerfWANConfig.ReconnectTimeout = a.config.ReconnectTimeoutWAN
 	}
-	if a.config.EncryptVerifyIncoming {
-		base.SerfWANConfig.MemberlistConfig.GossipVerifyIncoming = a.config.EncryptVerifyIncoming
-		base.SerfLANConfig.MemberlistConfig.GossipVerifyIncoming = a.config.EncryptVerifyIncoming
-	}
-	if a.config.EncryptVerifyOutgoing {
-		base.SerfWANConfig.MemberlistConfig.GossipVerifyOutgoing = a.config.EncryptVerifyOutgoing
-		base.SerfLANConfig.MemberlistConfig.GossipVerifyOutgoing = a.config.EncryptVerifyOutgoing
-	}
-	if a.config.RPCAdvertiseAddr != "" {
-		base.RPCAdvertise = a.config.RPCAdvertiseAddr
-	}
+
 	base.Segment = a.config.SegmentName
 	if len(a.config.Segments) > 0 {
 		segments, err := a.segmentConfig()
@@ -788,21 +756,13 @@ func (a *Agent) segmentConfig() ([]consul.NetworkSegment, error) {
 	var segments []consul.NetworkSegment
 	config := a.config
 
-	for _, segment := range config.Segments {
+	for _, s := range config.Segments {
 		serfConf := consul.DefaultConfig().SerfLANConfig
 
-		if segment.Advertise != "" {
-			serfConf.MemberlistConfig.AdvertiseAddr = segment.Advertise
-		} else {
-			serfConf.MemberlistConfig.AdvertiseAddr = a.config.AdvertiseAddrLAN
-		}
-		if segment.Bind != "" {
-			serfConf.MemberlistConfig.BindAddr = segment.Bind
-		} else {
-			serfConf.MemberlistConfig.BindAddr = a.config.BindAddr
-		}
-		serfConf.MemberlistConfig.AdvertisePort = segment.Port
-		serfConf.MemberlistConfig.BindPort = segment.Port
+		serfConf.MemberlistConfig.BindAddr = s.Bind.IP.String()
+		serfConf.MemberlistConfig.BindPort = s.Bind.Port
+		serfConf.MemberlistConfig.AdvertiseAddr = s.Advertise.IP.String()
+		serfConf.MemberlistConfig.AdvertisePort = s.Advertise.Port
 
 		if config.ReconnectTimeoutLAN != 0 {
 			serfConf.ReconnectTimeout = config.ReconnectTimeoutLAN
@@ -815,18 +775,18 @@ func (a *Agent) segmentConfig() ([]consul.NetworkSegment, error) {
 		}
 
 		var rpcAddr *net.TCPAddr
-		if segment.RPCListener {
+		if s.RPCListener {
 			rpcAddr = &net.TCPAddr{
-				IP:   net.ParseIP(segment.Bind),
+				IP:   s.Bind.IP,
 				Port: a.config.ServerPort,
 			}
 		}
 
 		segments = append(segments, consul.NetworkSegment{
-			Name:       segment.Name,
+			Name:       s.Name,
 			Bind:       serfConf.MemberlistConfig.BindAddr,
-			Port:       segment.Port,
 			Advertise:  serfConf.MemberlistConfig.AdvertiseAddr,
+			Port:       s.Bind.Port,
 			RPCAddr:    rpcAddr,
 			SerfConfig: serfConf,
 		})

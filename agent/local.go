@@ -94,7 +94,7 @@ type localState struct {
 func NewLocalState(c *config.RuntimeConfig, lg *log.Logger, tokens *token.Store) *localState {
 	lc := localStateConfig{
 		AEInterval:          c.AEInterval,
-		AdvertiseAddr:       c.AdvertiseAddrLAN,
+		AdvertiseAddr:       c.AdvertiseAddrLAN.String(),
 		CheckUpdateInterval: c.CheckUpdateInterval,
 		Datacenter:          c.Datacenter,
 		NodeID:              c.NodeID,

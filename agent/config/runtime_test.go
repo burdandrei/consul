@@ -134,6 +134,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				rt.AdvertiseAddrLAN = tcpAddr("1.2.3.4:8300")
 				rt.AdvertiseAddrWAN = tcpAddr("1.2.3.4:8300")
 				rt.RPCAdvertiseAddr = tcpAddr("1.2.3.4:8300")
+				rt.RPCBindAddr = tcpAddr("1.2.3.4:8300")
 				rt.SerfAdvertiseAddrLAN = tcpAddr("1.2.3.4:8301")
 				rt.SerfAdvertiseAddrWAN = tcpAddr("1.2.3.4:8302")
 			},
@@ -1153,14 +1154,21 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			err:   errors.New("Advertise WAN address cannot be 0.0.0.0, :: or [::]"),
 		},
 		{
-			desc:  "advertise_addrs.serf_lan ipv4 any",
+			desc:  "advertise_addrs.rpc any",
+			flags: []string{`-datacenter=a`},
+			json:  []string{`{ "advertise_addrs":{ "rpc": "[::]" } }`},
+			hcl:   []string{`advertise_addrs = { rpc = "[::]" }`},
+			err:   errors.New("RPC Advertise address cannot be 0.0.0.0, :: or [::]"),
+		},
+		{
+			desc:  "advertise_addrs.serf_lan any",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addrs":{ "serf_lan": "[::]" } }`},
 			hcl:   []string{`advertise_addrs = { serf_lan = "[::]" }`},
 			err:   errors.New("Serf Advertise LAN address cannot be 0.0.0.0, :: or [::]"),
 		},
 		{
-			desc:  "advertise_addrs.serf_wan ipv4 any",
+			desc:  "advertise_addrs.serf_wan any",
 			flags: []string{`-datacenter=a`},
 			json:  []string{`{ "advertise_addrs":{ "serf_wan": "0.0.0.0" } }`},
 			hcl:   []string{`advertise_addrs = { serf_wan = "0.0.0.0" }`},
@@ -1171,8 +1179,8 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		{
 			desc:  "segment.advertise any",
 			flags: []string{`-datacenter=a`},
-			json:  []string{`{ "segments":[{ "name":"x", "advertise": "::" }] }`},
-			hcl:   []string{`segments = [{ name = "x" advertise = "::" }]`},
+			json:  []string{`{ "segments":[{ "name":"x", "advertise": "::", "port": 123 }] }`},
+			hcl:   []string{`segments = [{ name = "x" advertise = "::" port = 123 }]`},
 			err:   errors.New(`segments[x].advertise cannot be 0.0.0.0, :: or [::]`),
 		},
 		{
@@ -1341,7 +1349,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					PublicIPv6:  func() (*net.IPAddr, error) { return ipAddr("2001:db8:1000"), nil },
 				}
 				if flags.DevMode != nil && *flags.DevMode {
-					b.Default = &defaultDevConfig
+					b.Default = &devConfig
 				}
 
 				// read the source fragements
@@ -1584,7 +1592,8 @@ func TestFullConfig(t *testing.T) {
 				"dns": 7001,
 				"http": 7999,
 				"https": 15127,
-				"rpc": 10664
+				"rpc": 10664,
+				"server": 3757
 			},
 			"protocol": 30793,
 			"raft_protocol": 19016,
@@ -2007,6 +2016,7 @@ func TestFullConfig(t *testing.T) {
 				http = 7999,
 				https = 15127
 				rpc = 10664
+				server = 3757
 			}
 			protocol = 30793
 			raft_protocol = 19016
@@ -2290,8 +2300,8 @@ func TestFullConfig(t *testing.T) {
 		ACLReplicationToken:              "LMmgy5dO",
 		ACLTTL:                           18060 * time.Second,
 		ACLToken:                         "O1El0wan",
-		AdvertiseAddrLAN:                 tcpAddr("17.99.29.16:8300"),
-		AdvertiseAddrWAN:                 tcpAddr("78.63.37.19:8300"),
+		AdvertiseAddrLAN:                 tcpAddr("17.99.29.16:3757"),
+		AdvertiseAddrWAN:                 tcpAddr("78.63.37.19:3757"),
 		AutopilotCleanupDeadServers:      true,
 		AutopilotDisableUpgradeMigration: true,
 		AutopilotLastContactThreshold:    12705 * time.Second,
@@ -2423,7 +2433,8 @@ func TestFullConfig(t *testing.T) {
 		NonVotingServer:           true,
 		PerformanceRaftMultiplier: 22057,
 		PidFile:                   "43xN80Km",
-		RPCAdvertiseAddr:          tcpAddr("28.27.94.38:8300"),
+		RPCAdvertiseAddr:          tcpAddr("28.27.94.38:3757"),
+		RPCBindAddr:               tcpAddr("16.99.34.17:3757"),
 		RPCProtocol:               30793,
 		RPCRateLimit:              12029.43,
 		RPCMaxBurst:               44848,
@@ -2441,24 +2452,22 @@ func TestFullConfig(t *testing.T) {
 		Segments: []structs.NetworkSegment{
 			{
 				Name:        "PExYMe2E",
-				Bind:        "36.73.36.19",
-				Port:        38295,
+				Bind:        tcpAddr("36.73.36.19:38295"),
+				Advertise:   tcpAddr("63.39.19.18:38295"),
 				RPCListener: true,
-				Advertise:   "63.39.19.18",
 			},
 			{
 				Name:        "UzCvJgup",
-				Bind:        "37.58.38.19",
-				Port:        39292,
+				Bind:        tcpAddr("37.58.38.19:39292"),
+				Advertise:   tcpAddr("83.58.26.27:39292"),
 				RPCListener: true,
-				Advertise:   "83.58.26.27",
 			},
 		},
 		SerfPortLAN: 8301,
 		SerfPortWAN: 8302,
 		ServerMode:  true,
 		ServerName:  "Oerr9n1G",
-		ServerPort:  8300,
+		ServerPort:  3757,
 		Services: []*structs.ServiceDefinition{
 			{
 				ID:                "wI1dzxS4",

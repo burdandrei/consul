@@ -68,11 +68,11 @@ var defaultConfig = Config{
 }
 
 // todo(fs): fix me
-var defaultDevConfig = defaultConfig
+var devConfig = defaultConfig
 
-// defaultRuntimeConfig contains the default values of the runtime configuration
+// nonUserConfig contains the default values of the runtime configuration
 // which cannot be configured through the config file.
-var defaultRuntimeConfig = RuntimeConfig{
+var nonUserConfig = RuntimeConfig{
 	ACLDisabledTTL:             120 * time.Second,
 	CheckDeregisterIntervalMin: 1 * time.Minute,
 	CheckReapInterval:          30 * time.Second,

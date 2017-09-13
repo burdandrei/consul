@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/consul/agent/config"
 	"github.com/hashicorp/consul/agent/consul"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/api"
@@ -45,7 +47,7 @@ type TestAgent struct {
 	// the callers responsibility to clean up the data directory.
 	// Otherwise, a temporary data directory is created and removed
 	// when Shutdown() is called.
-	Config *Config
+	Config *config.RuntimeConfig
 
 	// LogOutput is the sink for the logs. If nil, logs are written
 	// to os.Stderr.
@@ -83,7 +85,7 @@ type TestAgent struct {
 // configuration. It panics if the agent could not be started. The
 // caller should call Shutdown() to stop the agent and remove temporary
 // directories.
-func NewTestAgent(name string, c *Config) *TestAgent {
+func NewTestAgent(name string, c *config.RuntimeConfig) *TestAgent {
 	a := &TestAgent{Name: name, Config: c}
 	a.Start()
 	return a
@@ -101,9 +103,6 @@ func (a *TestAgent) Start() *TestAgent {
 	}
 	if a.Config == nil {
 		a.Config = TestConfig()
-	}
-	if a.Config.DNSRecursor != "" {
-		a.Config.DNSRecursors = append(a.Config.DNSRecursors, a.Config.DNSRecursor)
 	}
 	if a.Config.DataDir == "" {
 		name := "agent"
@@ -182,7 +181,7 @@ func (a *TestAgent) Start() *TestAgent {
 		if len(a.httpServers) == 0 {
 			r.Fatal(a.Name, "waiting for server")
 		}
-		if a.Config.Bootstrap && a.Config.Server {
+		if a.Config.Bootstrap && a.Config.ServerMode {
 			// Ensure we have a leader and a node registration.
 			args := &structs.DCSpecificRequest{
 				Datacenter: a.Config.Datacenter,
@@ -289,21 +288,37 @@ func TenPorts() int {
 // chance of port conflicts for concurrently executed test binaries.
 // Instead of relying on one set of ports to be sufficient we retry
 // starting the agent with different ports on port conflict.
-func pickRandomPorts(c *Config) {
+func pickRandomPorts(c *config.RuntimeConfig) {
 	port := TenPorts()
-	c.Ports.DNS = port + 1
-	c.Ports.HTTP = port + 2
+	for _, a := range c.DNSAddrs {
+		if x, ok := a.(*net.TCPAddr); ok {
+			x.Port = port + 2
+		}
+		if x, ok := a.(*net.UDPAddr); ok {
+			x.Port = port + 2
+		}
+	}
+	for _, a := range c.HTTPAddrs {
+		if x, ok := a.(*net.TCPAddr); ok {
+			x.Port = port + 2
+		}
+	}
 	// when we enable HTTPS then we need to fix finding the
 	// "first" HTTP server since that might be HTTPS server
 	// c.Ports.HTTPS = port + 3
-	c.Ports.SerfLan = port + 4
-	c.Ports.SerfWan = port + 5
-	c.Ports.Server = port + 6
+	c.SerfBindAddrLAN.Port = port + 4
+	c.SerfAdvertiseAddrLAN.Port = c.SerfBindAddrLAN.Port
+
+	c.SerfBindAddrWAN.Port = port + 5
+	c.SerfAdvertiseAddrWAN.Port = c.SerfBindAddrWAN.Port
+
+	c.RPCBindAddr.Port = port + 6
+	c.RPCAdvertiseAddr.Port = c.RPCBindAddr.Port
 }
 
 // TestConfig returns a unique default configuration for testing an
 // agent.
-func TestConfig() *Config {
+func TestConfig() *config.RuntimeConfig {
 	nodeID, err := uuid.GenerateUUID()
 	if err != nil {
 		panic(err)
@@ -347,7 +362,7 @@ func TestConfig() *Config {
 
 // TestACLConfig returns a default configuration for testing an agent
 // with ACLs.
-func TestACLConfig() *Config {
+func TestACLConfig() *config.RuntimeConfig {
 	cfg := TestConfig()
 	cfg.ACLDatacenter = cfg.Datacenter
 	cfg.ACLDefaultPolicy = "deny"

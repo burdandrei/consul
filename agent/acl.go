@@ -219,7 +219,7 @@ func (m *aclManager) lookupACL(a *Agent, id string) (acl.ACL, error) {
 // and some is informative (e.g. catalog and health).
 func (a *Agent) resolveToken(id string) (acl.ACL, error) {
 	// Disable ACLs if version 8 enforcement isn't enabled.
-	if !(*a.config.ACLEnforceVersion8) {
+	if !a.config.ACLEnforceVersion8 {
 		return nil, nil
 	}
 

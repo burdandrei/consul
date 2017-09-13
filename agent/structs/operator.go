@@ -1,6 +1,7 @@
 package structs
 
 import (
+	"net"
 	"time"
 
 	"github.com/hashicorp/raft"
@@ -231,15 +232,12 @@ type NetworkSegment struct {
 	Name string
 
 	// Bind is the bind address for this segment.
-	Bind string
+	Bind *net.TCPAddr
 
-	// Port is the port for this segment.
-	Port int
+	// Advertise is the advertise address of this segment.
+	Advertise *net.TCPAddr
 
 	// RPCListener is whether to bind a separate RPC listener on the bind address
 	// for this segment.
 	RPCListener bool
-
-	// Advertise is the advertise address of this segment.
-	Advertise string
 }

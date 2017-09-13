@@ -131,6 +131,7 @@ type RuntimeConfig struct {
 	NonVotingServer             bool
 	PidFile                     string
 	RPCAdvertiseAddr            *net.TCPAddr
+	RPCBindAddr                 *net.TCPAddr
 	RPCMaxBurst                 int
 	RPCProtocol                 int
 	RPCRateLimit                rate.Limit
@@ -197,18 +198,16 @@ func (c *RuntimeConfig) IncomingHTTPSConfig() (*tls.Config, error) {
 	return tc.IncomingTLSConfig()
 }
 
-type ProtoAddr struct {
-	Proto, Net, Addr string
-}
-
-func (p ProtoAddr) String() string {
-	return p.Proto + "://" + p.Addr
-}
-
-func (c *RuntimeConfig) GetDNSAddrs() ([]ProtoAddr, error) {
-	return nil, nil
-}
-
-func (c *RuntimeConfig) GetHTTPAddrs() ([]ProtoAddr, error) {
-	return nil, nil
+func (c *RuntimeConfig) Sanitized() RuntimeConfig {
+	var rt RuntimeConfig
+	rt = *c
+	rt.ACLMasterToken = "hidden"
+	rt.ACLToken = "hidden"
+	rt.ACLAgentMasterToken = "hidden"
+	rt.ACLAgentToken = "hidden"
+	rt.EncryptKey = "hidden"
+	rt.RetryJoinLAN = []string{"hidden (improve me)"}
+	rt.RetryJoinWAN = []string{"hidden (improve me)"}
+	rt.ConsulConfig = nil
+	return rt
 }
