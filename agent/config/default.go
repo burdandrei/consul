@@ -67,12 +67,47 @@ var defaultConfig = Config{
 	},
 }
 
-// todo(fs): fix me
-var devConfig = defaultConfig
+func DefaultConfig() *RuntimeConfig {
+	rt, _, _ := NewRuntimeConfig(defaultConfig)
+	return &rt
+}
 
-// nonUserConfig contains the default values of the runtime configuration
+func DevConfig() *Config {
+	conf := defaultConfig
+
+	conf.LogLevel = pString("DEBUG")
+	conf.ServerMode = pBool(true)
+	conf.EnableDebug = pBool(true)
+	conf.DisableAnonymousSignature = pBool(true)
+	conf.EnableUI = pBool(true)
+	conf.BindAddr = pString("127.0.0.1")
+	conf.DisableKeyringFile = pBool(true)
+
+	return &conf
+}
+
+func devConsulConfig(conf *consul.Config) *consul.Config {
+	conf.SerfLANConfig.MemberlistConfig.ProbeTimeout = 100 * time.Millisecond
+	conf.SerfLANConfig.MemberlistConfig.ProbeInterval = 100 * time.Millisecond
+	conf.SerfLANConfig.MemberlistConfig.GossipInterval = 100 * time.Millisecond
+
+	conf.SerfWANConfig.MemberlistConfig.SuspicionMult = 3
+	conf.SerfWANConfig.MemberlistConfig.ProbeTimeout = 100 * time.Millisecond
+	conf.SerfWANConfig.MemberlistConfig.ProbeInterval = 100 * time.Millisecond
+	conf.SerfWANConfig.MemberlistConfig.GossipInterval = 100 * time.Millisecond
+
+	conf.RaftConfig.LeaderLeaseTimeout = 20 * time.Millisecond
+	conf.RaftConfig.HeartbeatTimeout = 40 * time.Millisecond
+	conf.RaftConfig.ElectionTimeout = 40 * time.Millisecond
+
+	conf.CoordinateUpdatePeriod = 100 * time.Millisecond
+
+	return conf
+}
+
+// NonUserConfig contains the default values of the runtime configuration
 // which cannot be configured through the config file.
-var nonUserConfig = RuntimeConfig{
+var NonUserConfig = RuntimeConfig{
 	ACLDisabledTTL:             120 * time.Second,
 	CheckDeregisterIntervalMin: 1 * time.Minute,
 	CheckReapInterval:          30 * time.Second,

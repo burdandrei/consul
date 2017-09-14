@@ -9,6 +9,11 @@ import (
 	"github.com/hashicorp/hcl"
 )
 
+const (
+	SerfLANKeyring = "serf/local.keyring"
+	SerfWANKeyring = "serf/remote.keyring"
+)
+
 // ParseFile reads a JSON or HCL config file.
 func ParseFile(name string) (Config, error) {
 	format := "json"

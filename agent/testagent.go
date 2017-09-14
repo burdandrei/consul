@@ -324,18 +324,18 @@ func TestConfig() *config.RuntimeConfig {
 		panic(err)
 	}
 
-	cfg := DefaultConfig()
+	cfg := config.DefaultConfig()
 
 	cfg.Version = version.Version
 	cfg.VersionPrerelease = "c.d"
 
 	cfg.NodeID = types.NodeID(nodeID)
 	cfg.NodeName = "Node " + nodeID
-	cfg.BindAddr = "127.0.0.1"
-	cfg.AdvertiseAddr = "127.0.0.1"
+	cfg.BindAddr = &net.IPAddr{IP: net.ParseIP("127.0.0.1")}
+	cfg.AdvertiseAddrLAN = &net.TCPAddr{IP: net.ParseIP("127.0.0.1")}
 	cfg.Datacenter = "dc1"
 	cfg.Bootstrap = true
-	cfg.Server = true
+	cfg.ServerMode = true
 
 	ccfg := consul.DefaultConfig()
 	cfg.ConsulConfig = ccfg
@@ -356,7 +356,6 @@ func TestConfig() *config.RuntimeConfig {
 
 	ccfg.CoordinateUpdatePeriod = 100 * time.Millisecond
 	ccfg.ServerHealthInterval = 10 * time.Millisecond
-	cfg.SetupTaggedAndAdvertiseAddrs()
 	return cfg
 }
 
@@ -369,6 +368,6 @@ func TestACLConfig() *config.RuntimeConfig {
 	cfg.ACLMasterToken = "root"
 	cfg.ACLAgentToken = "root"
 	cfg.ACLAgentMasterToken = "towel"
-	cfg.ACLEnforceVersion8 = Bool(true)
+	cfg.ACLEnforceVersion8 = true
 	return cfg
 }

@@ -2,6 +2,7 @@ package config
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,6 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"bytes"
+
+	"github.com/hashicorp/consul/agent/consul"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/types"
 	"github.com/pascaldekloe/goe/verify"
@@ -107,6 +111,10 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.AdvertiseAddrLAN = tcpAddr("1.2.3.4:8300")
 				rt.AdvertiseAddrWAN = tcpAddr("1.2.3.4:8300")
+				rt.TaggedAddresses = map[string]string{
+					"lan": "1.2.3.4",
+					"wan": "1.2.3.4",
+				}
 			},
 		},
 		{
@@ -114,6 +122,10 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			flags: []string{`-advertise-wan`, `1.2.3.4`},
 			patch: func(rt *RuntimeConfig) {
 				rt.AdvertiseAddrWAN = tcpAddr("1.2.3.4:8300")
+				rt.TaggedAddresses = map[string]string{
+					"lan": "10.0.0.1",
+					"wan": "1.2.3.4",
+				}
 			},
 		},
 		{
@@ -122,6 +134,10 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.AdvertiseAddrLAN = tcpAddr("1.2.3.4:8300")
 				rt.AdvertiseAddrWAN = tcpAddr("5.6.7.8:8300")
+				rt.TaggedAddresses = map[string]string{
+					"lan": "1.2.3.4",
+					"wan": "5.6.7.8",
+				}
 			},
 		},
 		{
@@ -137,6 +153,10 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				rt.RPCBindAddr = tcpAddr("1.2.3.4:8300")
 				rt.SerfAdvertiseAddrLAN = tcpAddr("1.2.3.4:8301")
 				rt.SerfAdvertiseAddrWAN = tcpAddr("1.2.3.4:8302")
+				rt.TaggedAddresses = map[string]string{
+					"lan": "1.2.3.4",
+					"wan": "1.2.3.4",
+				}
 			},
 		},
 		{
@@ -178,6 +198,22 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			},
 		},
 		{
+			desc:  "-data-dir empty",
+			flags: []string{`-data-dir`, ``},
+			patch: func(rt *RuntimeConfig) {
+				rt.DataDir = ""
+			},
+			warns: []string{"Must specify data directory using -data-dir"},
+		},
+		{
+			desc:  "-data-dir given non-directory",
+			flags: []string{`-data-dir`, `runtime_test.go`},
+			patch: func(rt *RuntimeConfig) {
+				rt.DataDir = "runtime_test.go"
+			},
+			warns: []string{"The data-dir specified at \"runtime_test.go\" is not a directory"},
+		},
+		{
 			desc:  "-datacenter",
 			flags: []string{`-datacenter`, `a`},
 			patch: func(rt *RuntimeConfig) {
@@ -189,6 +225,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			flags: []string{`-dev`},
 			patch: func(rt *RuntimeConfig) {
 				rt.DevMode = true
+				rt.ConsulConfig = devConsulConfig(consul.DefaultConfig())
 			},
 		},
 		{
@@ -229,9 +266,9 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 		},
 		{ // todo(fs): shouldn't this be '-encrypt-key'?
 			desc:  "-encrypt",
-			flags: []string{`-encrypt`, `a`},
+			flags: []string{`-encrypt`, `i0P+gFTkLPg0h53eNYjydg==`},
 			patch: func(rt *RuntimeConfig) {
-				rt.EncryptKey = "a"
+				rt.EncryptKey = "i0P+gFTkLPg0h53eNYjydg=="
 			},
 		},
 		{
@@ -895,6 +932,10 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			patch: func(rt *RuntimeConfig) {
 				rt.AdvertiseAddrLAN = tcpAddr("1.2.3.4:8300")
 				rt.AdvertiseAddrWAN = tcpAddr("1.2.3.4:8300")
+				rt.TaggedAddresses = map[string]string{
+					"lan": "1.2.3.4",
+					"wan": "1.2.3.4",
+				}
 			},
 		},
 		{
@@ -903,6 +944,10 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 			hcl:  []string{`advertise_addr_wan = "{{ printf \"1.2.3.4\" }}"`},
 			patch: func(rt *RuntimeConfig) {
 				rt.AdvertiseAddrWAN = tcpAddr("1.2.3.4:8300")
+				rt.TaggedAddresses = map[string]string{
+					"lan": "10.0.0.1",
+					"wan": "1.2.3.4",
+				}
 			},
 		},
 		{
@@ -1035,6 +1080,10 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				rt.SerfBindAddrLAN = tcpAddr("3.3.3.3:8301")
 				rt.SerfBindAddrWAN = tcpAddr("4.4.4.4:8302")
 				rt.StartJoinAddrsLAN = []string{"c", "d", "a", "b"}
+				rt.TaggedAddresses = map[string]string{
+					"lan": "1.1.1.1",
+					"wan": "2.2.2.2",
+				}
 			},
 		},
 
@@ -1341,6 +1390,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 				}
 
 				// create the builder with the flags
+				defaultConfig.DataDir = pString("ddkErlg3")
 				b := &Builder{
 					Flags:       flags,
 					Default:     &defaultConfig,
@@ -1349,7 +1399,7 @@ func TestConfigFlagsAndEdgecases(t *testing.T) {
 					PublicIPv6:  func() (*net.IPAddr, error) { return ipAddr("2001:db8:1000"), nil },
 				}
 				if flags.DevMode != nil && *flags.DevMode {
-					b.Default = &devConfig
+					b.Default = DevConfig()
 				}
 
 				// read the source fragements
@@ -2388,6 +2438,7 @@ func TestFullConfig(t *testing.T) {
 		},
 		CheckUpdateInterval:       16507 * time.Second,
 		ClientAddrs:               []*net.IPAddr{ipAddr("93.83.18.19")},
+		ConsulConfig:              devConsulConfig(consul.DefaultConfig()),
 		DNSAddrs:                  []net.Addr{tcpAddr("93.95.95.81:7001"), udpAddr("93.95.95.81:7001")},
 		DNSAllowStale:             true,
 		DNSDisableCompression:     true,
@@ -2663,17 +2714,22 @@ func TestFullConfig(t *testing.T) {
 		TLSCipherSuites:                             []uint16{tls.TLS_RSA_WITH_RC4_128_SHA, tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA},
 		TLSMinVersion:                               "pAOWafkR",
 		TLSPreferServerCipherSuites:                 true,
-		TaggedAddresses:                             map[string]string{"7MYgHrYH": "dALJAhLD", "h6DdBy6K": "ebrr9zZ8"},
-		TranslateWANAddrs:                           true,
-		UIDir:                                       "11IFzAUn",
-		UnixSocketUser:                              "E0nB1DwA",
-		UnixSocketGroup:                             "8pFodrV8",
-		UnixSocketMode:                              "E8sAwOv4",
-		VerifyIncoming:                              true,
-		VerifyIncomingHTTPS:                         true,
-		VerifyIncomingRPC:                           true,
-		VerifyOutgoing:                              true,
-		VerifyServerHostname:                        true,
+		TaggedAddresses: map[string]string{
+			"7MYgHrYH": "dALJAhLD",
+			"h6DdBy6K": "ebrr9zZ8",
+			"lan":      "17.99.29.16",
+			"wan":      "78.63.37.19",
+		},
+		TranslateWANAddrs:    true,
+		UIDir:                "11IFzAUn",
+		UnixSocketUser:       "E0nB1DwA",
+		UnixSocketGroup:      "8pFodrV8",
+		UnixSocketMode:       "E8sAwOv4",
+		VerifyIncoming:       true,
+		VerifyIncomingHTTPS:  true,
+		VerifyIncomingRPC:    true,
+		VerifyOutgoing:       true,
+		VerifyServerHostname: true,
 		Watches: []map[string]interface{}{
 			map[string]interface{}{
 				"type":       "key",
@@ -2916,5 +2972,31 @@ func TestNonZero(t *testing.T) {
 				t.Fatalf("got error %v want %v", got, want)
 			}
 		})
+	}
+}
+
+func TestConfigDecodeBytes(t *testing.T) {
+	t.Parallel()
+	// Test with some input
+	src := []byte("abc")
+	key := base64.StdEncoding.EncodeToString(src)
+
+	result, err := decodeBytes(key)
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+
+	if !bytes.Equal(src, result) {
+		t.Fatalf("bad: %#v", result)
+	}
+
+	// Test with no input
+	result, err = decodeBytes("")
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+
+	if len(result) > 0 {
+		t.Fatalf("bad: %#v", result)
 	}
 }

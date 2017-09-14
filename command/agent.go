@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"flag"
+
 	"github.com/armon/go-metrics"
 	"github.com/armon/go-metrics/circonus"
 	"github.com/armon/go-metrics/datadog"
@@ -49,15 +51,26 @@ type AgentCommand struct {
 // readConfig is responsible for setup of our configuration using
 // the command line and any file configs
 func (cmd *AgentCommand) readConfig() *config.RuntimeConfig {
-	var cmdCfg config.RuntimeConfig
-	var cfgFiles []string
-	var retryInterval string
-	var retryIntervalWan string
-	var dnsRecursors []string
-	var dev bool
-	var nodeMeta []string
+	var flags config.Flags
+	fs := flag.NewFlagSet("", flag.ContinueOnError)
+	config.AddFlags(fs, &flags)
+	if err := fs.Parse(cmd.args); err != nil {
+		panic(fmt.Sprintf("error parsing flags: %v", err))
+	}
 
-	f := cmd.BaseCommand.NewFlagSet(cmd)
+	b := config.Builder{
+		Flags:          flags,
+		DefaultRuntime: config.NonUserConfig,
+	}
+
+	for _, file := range flags.ConfigFiles {
+		b.ReadPath(file)
+	}
+
+	cfg, err := b.BuildAndValidate()
+	if err != nil {
+		panic(err)
+	}
 
 	// done: f.Var((*configutil.AppendSliceValue)(&cfgFiles), "config-file",
 	// done: 	"Path to a JSON file to read configuration from. This can be specified multiple times.")
@@ -226,10 +239,10 @@ func (cmd *AgentCommand) readConfig() *config.RuntimeConfig {
 	// done: 	}
 	// done: }
 
-	cfg := agent.DefaultConfig()
-	if dev {
-		cfg = agent.DevConfig()
-	}
+	// cfg := agent.DefaultConfig()
+	// if dev {
+	//	cfg = agent.DevConfig()
+	//}
 
 	// done: if len(cfgFiles) > 0 {
 	// done: 	fileConfig, err := agent.ReadConfigPaths(cfgFiles)
@@ -270,69 +283,69 @@ func (cmd *AgentCommand) readConfig() *config.RuntimeConfig {
 	// done: }
 
 	// Ensure we have a data directory if we are not in dev mode.
-	if !dev {
-		if cfg.DataDir == "" {
-			cmd.UI.Error("Must specify data directory using -data-dir")
-			return nil
-		}
+	// done: if !dev {
+	// done: 	if cfg.DataDir == "" {
+	// done: 		cmd.UI.Error("Must specify data directory using -data-dir")
+	// done: 		return nil
+	// done: 	}
 
-		if finfo, err := os.Stat(cfg.DataDir); err != nil {
-			if !os.IsNotExist(err) {
-				cmd.UI.Error(fmt.Sprintf("Error getting data-dir: %s", err))
-				return nil
-			}
-		} else if !finfo.IsDir() {
-			cmd.UI.Error(fmt.Sprintf("The data-dir specified at %q is not a directory", cfg.DataDir))
-			return nil
-		}
-	}
+	// done: 	if finfo, err := os.Stat(cfg.DataDir); err != nil {
+	// done: 		if !os.IsNotExist(err) {
+	// done: 			cmd.UI.Error(fmt.Sprintf("Error getting data-dir: %s", err))
+	// done: 			return nil
+	// done: 		}
+	// done: 	} else if !finfo.IsDir() {
+	// done: 		cmd.UI.Error(fmt.Sprintf("The data-dir specified at %q is not a directory", cfg.DataDir))
+	// done: 		return nil
+	// done: 	}
+	// done: }
 
 	// Ensure all endpoints are unique
-	if err := cfg.VerifyUniqueListeners(); err != nil {
+	/*if err := cfg.VerifyUniqueListeners(); err != nil {
 		cmd.UI.Error(fmt.Sprintf("All listening endpoints must be unique: %s", err))
 		return nil
-	}
+	}*/
 
 	// Check the data dir for signs of an un-migrated Consul 0.5.x or older
 	// server. Consul refuses to start if this is present to protect a server
 	// with existing data from starting on a fresh data set.
-	if cfg.Server {
-		mdbPath := filepath.Join(cfg.DataDir, "mdb")
-		if _, err := os.Stat(mdbPath); !os.IsNotExist(err) {
-			if os.IsPermission(err) {
-				cmd.UI.Error(fmt.Sprintf("CRITICAL: Permission denied for data folder at %q!", mdbPath))
-				cmd.UI.Error("Consul will refuse to boot without access to this directory.")
-				cmd.UI.Error("Please correct permissions and try starting again.")
-				return nil
-			}
-			cmd.UI.Error(fmt.Sprintf("CRITICAL: Deprecated data folder found at %q!", mdbPath))
-			cmd.UI.Error("Consul will refuse to boot with this directory present.")
-			cmd.UI.Error("See https://www.consul.io/docs/upgrade-specific.html for more information.")
-			return nil
-		}
-	}
+	// done: if cfg.Server {
+	// done: 	mdbPath := filepath.Join(cfg.DataDir, "mdb")
+	// done: 	if _, err := os.Stat(mdbPath); !os.IsNotExist(err) {
+	// done: 		if os.IsPermission(err) {
+	// done: 			cmd.UI.Error(fmt.Sprintf("CRITICAL: Permission denied for data folder at %q!", mdbPath))
+	// done: 			cmd.UI.Error("Consul will refuse to boot without access to this directory.")
+	// done: 			cmd.UI.Error("Please correct permissions and try starting again.")
+	// done: 			return nil
+	// done: 		}
+	// done: 		cmd.UI.Error(fmt.Sprintf("CRITICAL: Deprecated data folder found at %q!", mdbPath))
+	// done: 		cmd.UI.Error("Consul will refuse to boot with this directory present.")
+	// done: 		cmd.UI.Error("See https://www.consul.io/docs/upgrade-specific.html for more information.")
+	// done: 		return nil
+	// done: 	}
+	// done: }
 
 	// Verify DNS settings
 	// done: if cfg.DNSConfig.UDPAnswerLimit < 1 {
 	// done: 	cmd.UI.Error(fmt.Sprintf("dns_config.udp_answer_limit %d too low, must always be greater than zero", cfg.DNSConfig.UDPAnswerLimit))
 	// done: }
 
-	if cfg.EncryptKey != "" {
-		if _, err := cfg.EncryptBytes(); err != nil {
-			cmd.UI.Error(fmt.Sprintf("Invalid encryption key: %s", err))
-			return nil
-		}
-		keyfileLAN := filepath.Join(cfg.DataDir, agent.SerfLANKeyring)
-		if _, err := os.Stat(keyfileLAN); err == nil {
-			cmd.UI.Error("WARNING: LAN keyring exists but -encrypt given, using keyring")
-		}
-		if cfg.Server {
-			keyfileWAN := filepath.Join(cfg.DataDir, agent.SerfWANKeyring)
-			if _, err := os.Stat(keyfileWAN); err == nil {
-				cmd.UI.Error("WARNING: WAN keyring exists but -encrypt given, using keyring")
-			}
-		}
-	}
+	// done: if cfg.EncryptKey != "" {
+	// done: 	if _, err := cfg.EncryptBytes(); err != nil {
+	// done: 		cmd.UI.Error(fmt.Sprintf("Invalid encryption key: %s", err))
+	// done: 		return nil
+	// done: 	}
+	// done: 	keyfileLAN := filepath.Join(cfg.DataDir, agent.SerfLANKeyring)
+	// done: 	if _, err := os.Stat(keyfileLAN); err == nil {
+	// done: 		cmd.UI.Error("WARNING: LAN keyring exists but -encrypt given, using keyring")
+	// done: 	}
+	// done: 	if cfg.Server {
+	// done: 		keyfileWAN := filepath.Join(cfg.DataDir, agent.SerfWANKeyring)
+	// done: 		if _, err := os.Stat(keyfileWAN); err == nil {
+	// done: 			cmd.UI.Error("WARNING: WAN keyring exists but -encrypt given, using keyring")
+	// done: 		}
+	// done: 	}
+	// done: }
 
 	// done: // Ensure the datacenter is always lowercased. The DNS endpoints automatically
 	// done: // lowercase all queries, and internally we expect DC1 and dc1 to be the same.
@@ -531,17 +544,17 @@ func (cmd *AgentCommand) readConfig() *config.RuntimeConfig {
 	// done: cfg.Version = cmd.Version
 	// done: cfg.VersionPrerelease = cmd.VersionPrerelease
 
-	if err := cfg.ResolveTmplAddrs(); err != nil {
+	/*if err := cfg.ResolveTmplAddrs(); err != nil {
 		cmd.UI.Error(fmt.Sprintf("Failed to parse config: %v", err))
 		return nil
-	}
+	}*/
 
-	if err := cfg.SetupTaggedAndAdvertiseAddrs(); err != nil {
-		cmd.UI.Error(fmt.Sprintf("Failed to set up tagged and advertise addresses: %v", err))
-		return nil
-	}
+	// done: if err := cfg.SetupTaggedAndAdvertiseAddrs(); err != nil {
+	// done: 	cmd.UI.Error(fmt.Sprintf("Failed to set up tagged and advertise addresses: %v", err))
+	// done: 	return nil
+	// done: }
 
-	return cfg
+	return &cfg
 }
 
 // checkpointResults is used to handler periodic results from our update checker
@@ -563,7 +576,7 @@ func (cmd *AgentCommand) checkpointResults(results *checkpoint.CheckResponse, er
 	}
 }
 
-func (cmd *AgentCommand) startupUpdateCheck(config *agent.Config) {
+func (cmd *AgentCommand) startupUpdateCheck(config *config.RuntimeConfig) {
 	version := config.Version
 	if config.VersionPrerelease != "" {
 		version += fmt.Sprintf("-%s", config.VersionPrerelease)
@@ -587,13 +600,13 @@ func (cmd *AgentCommand) startupUpdateCheck(config *agent.Config) {
 }
 
 // startupJoin is invoked to handle any joins specified to take place at start time
-func (cmd *AgentCommand) startupJoin(agent *agent.Agent, cfg *agent.Config) error {
-	if len(cfg.StartJoin) == 0 {
+func (cmd *AgentCommand) startupJoin(agent *agent.Agent, cfg *config.RuntimeConfig) error {
+	if len(cfg.StartJoinAddrsLAN) == 0 {
 		return nil
 	}
 
 	cmd.UI.Output("Joining cluster...")
-	n, err := agent.JoinLAN(cfg.StartJoin)
+	n, err := agent.JoinLAN(cfg.StartJoinAddrsLAN)
 	if err != nil {
 		return err
 	}
@@ -603,13 +616,13 @@ func (cmd *AgentCommand) startupJoin(agent *agent.Agent, cfg *agent.Config) erro
 }
 
 // startupJoinWan is invoked to handle any joins -wan specified to take place at start time
-func (cmd *AgentCommand) startupJoinWan(agent *agent.Agent, cfg *agent.Config) error {
-	if len(cfg.StartJoinWan) == 0 {
+func (cmd *AgentCommand) startupJoinWan(agent *agent.Agent, cfg *config.RuntimeConfig) error {
+	if len(cfg.StartJoinAddrsWAN) == 0 {
 		return nil
 	}
 
 	cmd.UI.Output("Joining -wan cluster...")
-	n, err := agent.JoinWAN(cfg.StartJoinWan)
+	n, err := agent.JoinWAN(cfg.StartJoinAddrsWAN)
 	if err != nil {
 		return err
 	}
@@ -618,51 +631,51 @@ func (cmd *AgentCommand) startupJoinWan(agent *agent.Agent, cfg *agent.Config) e
 	return nil
 }
 
-func statsiteSink(config *agent.Config, hostname string) (metrics.MetricSink, error) {
-	if config.Telemetry.StatsiteAddr == "" {
+func statsiteSink(config *config.RuntimeConfig, hostname string) (metrics.MetricSink, error) {
+	if config.TelemetryStatsiteAddr == "" {
 		return nil, nil
 	}
-	return metrics.NewStatsiteSink(config.Telemetry.StatsiteAddr)
+	return metrics.NewStatsiteSink(config.TelemetryStatsiteAddr)
 }
 
-func statsdSink(config *agent.Config, hostname string) (metrics.MetricSink, error) {
-	if config.Telemetry.StatsdAddr == "" {
+func statsdSink(config *config.RuntimeConfig, hostname string) (metrics.MetricSink, error) {
+	if config.TelemetryStatsdAddr == "" {
 		return nil, nil
 	}
-	return metrics.NewStatsdSink(config.Telemetry.StatsdAddr)
+	return metrics.NewStatsdSink(config.TelemetryStatsdAddr)
 }
 
-func dogstatdSink(config *agent.Config, hostname string) (metrics.MetricSink, error) {
-	if config.Telemetry.DogStatsdAddr == "" {
+func dogstatdSink(config *config.RuntimeConfig, hostname string) (metrics.MetricSink, error) {
+	if config.TelemetryDogstatsdAddr == "" {
 		return nil, nil
 	}
-	sink, err := datadog.NewDogStatsdSink(config.Telemetry.DogStatsdAddr, hostname)
+	sink, err := datadog.NewDogStatsdSink(config.TelemetryDogstatsdAddr, hostname)
 	if err != nil {
 		return nil, err
 	}
-	sink.SetTags(config.Telemetry.DogStatsdTags)
+	sink.SetTags(config.TelemetryDogstatsdTags)
 	return sink, nil
 }
 
-func circonusSink(config *agent.Config, hostname string) (metrics.MetricSink, error) {
-	if config.Telemetry.CirconusAPIToken == "" && config.Telemetry.CirconusCheckSubmissionURL == "" {
+func circonusSink(config *config.RuntimeConfig, hostname string) (metrics.MetricSink, error) {
+	if config.TelemetryCirconusAPIToken == "" && config.TelemetryCirconusSubmissionURL == "" {
 		return nil, nil
 	}
 
 	cfg := &circonus.Config{}
-	cfg.Interval = config.Telemetry.CirconusSubmissionInterval
-	cfg.CheckManager.API.TokenKey = config.Telemetry.CirconusAPIToken
-	cfg.CheckManager.API.TokenApp = config.Telemetry.CirconusAPIApp
-	cfg.CheckManager.API.URL = config.Telemetry.CirconusAPIURL
-	cfg.CheckManager.Check.SubmissionURL = config.Telemetry.CirconusCheckSubmissionURL
-	cfg.CheckManager.Check.ID = config.Telemetry.CirconusCheckID
-	cfg.CheckManager.Check.ForceMetricActivation = config.Telemetry.CirconusCheckForceMetricActivation
-	cfg.CheckManager.Check.InstanceID = config.Telemetry.CirconusCheckInstanceID
-	cfg.CheckManager.Check.SearchTag = config.Telemetry.CirconusCheckSearchTag
-	cfg.CheckManager.Check.DisplayName = config.Telemetry.CirconusCheckDisplayName
-	cfg.CheckManager.Check.Tags = config.Telemetry.CirconusCheckTags
-	cfg.CheckManager.Broker.ID = config.Telemetry.CirconusBrokerID
-	cfg.CheckManager.Broker.SelectTag = config.Telemetry.CirconusBrokerSelectTag
+	cfg.Interval = config.TelemetryCirconusSubmissionInterval
+	cfg.CheckManager.API.TokenKey = config.TelemetryCirconusAPIToken
+	cfg.CheckManager.API.TokenApp = config.TelemetryCirconusAPIApp
+	cfg.CheckManager.API.URL = config.TelemetryCirconusAPIURL
+	cfg.CheckManager.Check.SubmissionURL = config.TelemetryCirconusSubmissionURL
+	cfg.CheckManager.Check.ID = config.TelemetryCirconusCheckID
+	cfg.CheckManager.Check.ForceMetricActivation = config.TelemetryCirconusCheckForceMetricActivation
+	cfg.CheckManager.Check.InstanceID = config.TelemetryCirconusCheckInstanceID
+	cfg.CheckManager.Check.SearchTag = config.TelemetryCirconusCheckSearchTag
+	cfg.CheckManager.Check.DisplayName = config.TelemetryCirconusCheckDisplayName
+	cfg.CheckManager.Check.Tags = config.TelemetryCirconusCheckTags
+	cfg.CheckManager.Broker.ID = config.TelemetryCirconusBrokerID
+	cfg.CheckManager.Broker.SelectTag = config.TelemetryCirconusBrokerSelectTag
 
 	if cfg.CheckManager.Check.DisplayName == "" {
 		cfg.CheckManager.Check.DisplayName = "Consul"
@@ -684,19 +697,19 @@ func circonusSink(config *agent.Config, hostname string) (metrics.MetricSink, er
 	return sink, nil
 }
 
-func startupTelemetry(config *agent.Config) (*metrics.InmemSink, error) {
+func startupTelemetry(conf *config.RuntimeConfig) (*metrics.InmemSink, error) {
 	// Setup telemetry
 	// Aggregate on 10 second intervals for 1 minute. Expose the
 	// metrics over stderr when there is a SIGUSR1 received.
 	memSink := metrics.NewInmemSink(10*time.Second, time.Minute)
 	metrics.DefaultInmemSignal(memSink)
-	metricsConf := metrics.DefaultConfig(config.Telemetry.StatsitePrefix)
-	metricsConf.EnableHostname = !config.Telemetry.DisableHostname
-	metricsConf.FilterDefault = *config.Telemetry.FilterDefault
+	metricsConf := metrics.DefaultConfig(conf.TelemetryStatsitePrefix)
+	metricsConf.EnableHostname = !conf.TelemetryDisableHostname
+	metricsConf.FilterDefault = conf.TelemetryFilterDefault
 
 	var sinks metrics.FanoutSink
-	addSink := func(name string, fn func(*agent.Config, string) (metrics.MetricSink, error)) error {
-		s, err := fn(config, metricsConf.HostName)
+	addSink := func(name string, fn func(*config.RuntimeConfig, string) (metrics.MetricSink, error)) error {
+		s, err := fn(conf, metricsConf.HostName)
 		if err != nil {
 			return err
 		}
@@ -809,8 +822,8 @@ func (cmd *AgentCommand) run(args []string) int {
 	// Let the agent know we've finished registration
 	agent.StartSync()
 
-	segment := config.Segment
-	if config.Server {
+	segment := config.SegmentName
+	if config.ServerMode {
 		segment = "<all>"
 	}
 
@@ -819,11 +832,11 @@ func (cmd *AgentCommand) run(args []string) int {
 	cmd.UI.Info(fmt.Sprintf("       Node ID: '%s'", config.NodeID))
 	cmd.UI.Info(fmt.Sprintf("     Node name: '%s'", config.NodeName))
 	cmd.UI.Info(fmt.Sprintf("    Datacenter: '%s' (Segment: '%s')", config.Datacenter, segment))
-	cmd.UI.Info(fmt.Sprintf("        Server: %v (Bootstrap: %v)", config.Server, config.Bootstrap))
-	cmd.UI.Info(fmt.Sprintf("   Client Addr: %v (HTTP: %d, HTTPS: %d, DNS: %d)", config.ClientAddr,
-		config.Ports.HTTP, config.Ports.HTTPS, config.Ports.DNS))
-	cmd.UI.Info(fmt.Sprintf("  Cluster Addr: %v (LAN: %d, WAN: %d)", config.AdvertiseAddr,
-		config.Ports.SerfLan, config.Ports.SerfWan))
+	cmd.UI.Info(fmt.Sprintf("        Server: %v (Bootstrap: %v)", config.ServerMode, config.Bootstrap))
+	cmd.UI.Info(fmt.Sprintf("   Client Addr: %v (HTTP: %d, HTTPS: %d, DNS: %d)", config.ClientAddrs,
+		config.HTTPPort, config.HTTPSPort, config.DNSPort))
+	cmd.UI.Info(fmt.Sprintf("  Cluster Addr: %v (LAN: %d, WAN: %d)", config.AdvertiseAddrLAN,
+		config.SerfPortLAN, config.SerfPortWAN))
 	cmd.UI.Info(fmt.Sprintf("       Encrypt: Gossip: %v, TLS-Outgoing: %v, TLS-Incoming: %v",
 		agent.GossipEncrypted(), config.VerifyOutgoing, config.VerifyIncoming))
 
@@ -878,7 +891,7 @@ func (cmd *AgentCommand) run(args []string) int {
 		default:
 			cmd.logger.Println("[INFO] Caught signal: ", sig)
 
-			graceful := (sig == os.Interrupt && !(*config.SkipLeaveOnInt)) || (sig == syscall.SIGTERM && (*config.LeaveOnTerm))
+			graceful := (sig == os.Interrupt && !(config.SkipLeaveOnInt)) || (sig == syscall.SIGTERM && (config.LeaveOnTerm))
 			if !graceful {
 				cmd.logger.Println("[INFO] Graceful shutdown disabled. Exiting")
 				return 1

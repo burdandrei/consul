@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net"
 	"os"
@@ -9,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"path/filepath"
 
 	"github.com/hashicorp/consul/agent/consul"
 	"github.com/hashicorp/consul/agent/structs"
@@ -26,7 +29,7 @@ import (
 func NewRuntimeConfig(c ...Config) (RuntimeConfig, []string, error) {
 	b := &Builder{
 		Configs:        c,
-		DefaultRuntime: nonUserConfig,
+		DefaultRuntime: NonUserConfig,
 	}
 	rt, err := b.BuildAndValidate()
 	return rt, b.Warnings, err
@@ -255,9 +258,14 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 	// otherwise appended instead of prepended.
 
 	var cfgs []Config
-	if b.Default != nil {
-		cfgs = append(cfgs, *b.Default)
+	if b.Default == nil {
+		if b.boolVal(b.Flags.DevMode) {
+			b.Default = DevConfig()
+		} else {
+			b.Default = &defaultConfig
+		}
 	}
+	cfgs = append(cfgs, *b.Default)
 
 	flagSlices, flagValues := b.splitSlicesAndValues(b.Flags.Config)
 	cfgs = append(cfgs, flagSlices)
@@ -404,6 +412,13 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 			dnsAddrs = append(dnsAddrs, &net.UDPAddr{IP: x.IP, Port: x.Port})
 		}
 	}
+
+	// Create the default set of tagged addresses.
+	if c.TaggedAddresses == nil {
+		c.TaggedAddresses = make(map[string]string)
+	}
+	c.TaggedAddresses["lan"] = advertiseAddrLAN.IP.String()
+	c.TaggedAddresses["wan"] = advertiseAddrWAN.IP.String()
 
 	// segments
 	var segments []structs.NetworkSegment
@@ -599,6 +614,12 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		b.warn(`==> DEPRECATION: "retry_join_gce" is deprecated. Please add %q to "retry_join".`, m)
 	}
 
+	var consulConfig *consul.Config
+	if b.boolVal(b.Flags.DevMode) {
+		consulConfig = consul.DefaultConfig()
+		consulConfig = devConsulConfig(consulConfig)
+	}
+
 	// ----------------------------------------------------------------
 	// build runtime config
 	//
@@ -699,6 +720,7 @@ func (b *Builder) Build() (rt RuntimeConfig, err error) {
 		CheckUpdateInterval:         b.durationVal(c.CheckUpdateInterval),
 		Checks:                      checks,
 		ClientAddrs:                 clientAddrs,
+		ConsulConfig:                consulConfig,
 		DataDir:                     b.stringVal(c.DataDir),
 		Datacenter:                  strings.ToLower(b.stringVal(c.Datacenter)),
 		DevMode:                     b.boolVal(b.Flags.DevMode),
@@ -831,6 +853,50 @@ func (b *Builder) Validate(rt RuntimeConfig) error {
 
 	if rt.Bootstrap {
 		b.warn(`Bootstrap mode enabled! Do not enable unless necessary`)
+	}
+
+	if !rt.DevMode {
+		if rt.DataDir == "" {
+			b.warn("Must specify data directory using -data-dir")
+		}
+
+		if finfo, err := os.Stat(rt.DataDir); err != nil {
+			if !os.IsNotExist(err) {
+				b.warn(fmt.Sprintf("Error getting data-dir: %s", err))
+			}
+		} else if !finfo.IsDir() {
+			b.warn(fmt.Sprintf("The data-dir specified at %q is not a directory", rt.DataDir))
+		}
+	}
+
+	if rt.ServerMode {
+		mdbPath := filepath.Join(rt.DataDir, "mdb")
+		if _, err := os.Stat(mdbPath); !os.IsNotExist(err) {
+			if os.IsPermission(err) {
+				b.warn(fmt.Sprintf("CRITICAL: Permission denied for data folder at %q!", mdbPath))
+				b.warn("Consul will refuse to boot without access to this directory.")
+				b.warn("Please correct permissions and try starting again.")
+			}
+			b.warn(fmt.Sprintf("CRITICAL: Deprecated data folder found at %q!", mdbPath))
+			b.warn("Consul will refuse to boot with this directory present.")
+			b.warn("See https://www.consul.io/docs/upgrade-specific.html for more information.")
+		}
+	}
+
+	if rt.EncryptKey != "" {
+		if _, err := decodeBytes(rt.EncryptKey); err != nil {
+			b.warn(fmt.Sprintf("Invalid encryption key: %s", err))
+		}
+		keyfileLAN := filepath.Join(rt.DataDir, SerfLANKeyring)
+		if _, err := os.Stat(keyfileLAN); err == nil {
+			b.warn("WARNING: LAN keyring exists but -encrypt given, using keyring")
+		}
+		if rt.ServerMode {
+			keyfileWAN := filepath.Join(rt.DataDir, SerfWANKeyring)
+			if _, err := os.Stat(keyfileWAN); err == nil {
+				b.warn("WARNING: WAN keyring exists but -encrypt given, using keyring")
+			}
+		}
 	}
 
 	if rt.EnableUI && rt.UIDir != "" {
@@ -1295,4 +1361,9 @@ func (b *Builder) makeAddrs(pri []net.Addr, sec []*net.IPAddr, port int) []net.A
 func (b *Builder) isUnixAddr(a net.Addr) bool {
 	_, ok := a.(*net.UnixAddr)
 	return a != nil && ok
+}
+
+// decodeBytes returns the encryption key decoded.
+func decodeBytes(key string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(key)
 }
